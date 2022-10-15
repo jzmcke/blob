@@ -1,7 +1,7 @@
 /* Responsible for send data callback, populating a shared receive data array and */
 #ifdef BLOB_WEBSOCKETS
-#include "blob/include/blob.h"
-#include "blob/include/blob_comm.h"
+#include "../include/blob.h"
+#include "blob_comm.h"
 #include "minimal_websocket/include/minimal_websocket.h"
 
 int

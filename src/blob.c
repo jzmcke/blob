@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 #include "blob_node_tree.h"
-#include "blob/include/blob.h"
+#include "../include/blob.h"
 #include "blob_node.h"
 
 blob_comm_cfg g_blob_ccfg;

@@ -48,13 +48,12 @@ int
 blob_retrieve_flush(blob *p_blob);
 
 
-
-#ifdef BLOB_ESP32_WEBSOCKETS
+// #ifdef BLOB_ESP32_WEBSOCKETS
     extern int _blob_espws_init(blob_comm_cfg*,const char*, int);
     extern int _blob_espws_terminate(blob_comm_cfg*);
     #define BLOB_INIT(address, port)                                   _blob_espws_init(&g_blob_ccfg, address, port); blob_init(&g_blob_ccfg)
     #define BLOB_TERMINATE()                                           _blob_espws_terminate(&g_blob_ccfg)
-#endif
+// #endif
 
 
 #ifdef BLOB_ESP32_UDP

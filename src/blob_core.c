@@ -1,5 +1,5 @@
 #include "blob_core.h"
-#include "blob/include/blob.h"
+#include "../include/blob.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>

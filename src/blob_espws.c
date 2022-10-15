@@ -1,11 +1,14 @@
 /* Responsible for send data callback, populating a shared receive data array and */
 #ifdef BLOB_ESP32_WEBSOCKETS
-#include "blob/include/blob.h"
-#include "blob/include/blob_comm.h"
+#include "../include/blob.h"
+#include "blob_comm.h"
 #include "esp_websocket_client.h"
 
+
+esp_websocket_client_config_t g_ws_cfg;
+
 int
-_blob_espws_init(blob_comm_cfg *p_cfg, char *addr, int port);
+_blob_espws_init(blob_comm_cfg *p_cfg, const char *addr, int port);
 
 int
 _blob_espws_terminate(blob_comm_cfg *p_blob_comm_cfg);
@@ -16,34 +19,33 @@ _blob_espws_rcv_callback(void *p_context, unsigned char **pp_recv_data, size_t *
 int
 _blob_espws_send_callback(void *p_context, unsigned char *p_send_data, size_t total_size);
 
+static void
+websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
+
 typedef struct blob_espws_state_s
 {
-    esp_websocket_client_handle_t *p_espws_client;
+    esp_websocket_client_handle_t p_espws_client;
     unsigned char *p_data;
     size_t n_data;
 } blob_espws_state;
 
 int
-_blob_espws_init(blob_comm_cfg *p_cfg, char *addr, int port)
+_blob_espws_init(blob_comm_cfg *p_cfg, const char *addr, int port)
 {
     
     blob_espws_state *p_espws;
-    esp_websocket_client_config_t ws_cfg = {
-        .uri = "ws://192.168.50.115",
-        .port = 8000,
-    };
     esp_err_t err;
 
-    ws_cfg.uri = addr;
-    ws_cfg.port = port;
-    p_espws->p_espws_client = esp_websocket_client_init(&ws_cfg);
+    p_espws = (blob_espws_state*)calloc(sizeof(blob_espws_state), 1);
+    g_ws_cfg.uri = addr;
+    g_ws_cfg.port = port;
+    p_espws->p_espws_client = esp_websocket_client_init(&g_ws_cfg);
 
-    p_espws = (blob_espws_state*)calloc(sizeof(blob_espws_state));
     p_espws->n_data = 0;
     p_espws->p_data = NULL;
-    esp_websocket_register_events(p_esp_ws->p_espws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)(&p_espws));
+    esp_websocket_register_events(p_espws->p_espws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)(p_espws));
 
-    err = esp_websocket_client_start(p_esp_ws->p_espws_client);
+    err = esp_websocket_client_start(p_espws->p_espws_client);
     if (ESP_OK != err)
     {
         printf("Error establishing connection with server.");
@@ -63,8 +65,8 @@ _blob_espws_terminate(blob_comm_cfg *p_blob_comm_cfg)
 {
     esp_err_t err;
     blob_espws_state *p_espws = (blob_espws_state*)p_blob_comm_cfg->p_send_context;
-    err = esp_websocket_client_stop(p_esp_ws->p_espws_client);
-    esp_websocket_client_destroy(p_esp_ws->p_espws_client);
+    err = esp_websocket_client_stop(p_espws->p_espws_client);
+    esp_websocket_client_destroy(p_espws->p_espws_client);
     return 0;
 }
 
@@ -96,7 +98,8 @@ _blob_espws_rcv_callback(void *p_context, unsigned char **pp_recv_data, size_t *
 };
 
 
-static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+static void
+websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     blob_espws_state *p_state = (blob_espws_state*)handler_args;
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t*)event_data;

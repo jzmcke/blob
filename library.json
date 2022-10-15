@@ -1,0 +1,35 @@
+{
+    "authors": [
+        {
+            "maintainer": true,
+            "name": "Joseph McKee",
+            "url": "https://github.com/jzmcke"
+        }
+    ],
+    "description": "Generic data serialization and transmission for ESP32, Linux, OSX",
+    "export": {
+        "exclude": [
+            "tests",
+            "frontend",
+            "js",
+            "make",
+            "script"
+        ]
+    },
+    "frameworks": "arduino",
+    "keywords": "blob, websocket, web, server, client, serialization, communication, metadata, udp",
+    "license": "LGPL-2.1",
+    "name": "Blob",
+    "platforms": "espressif32",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jzmcke/blob.git"
+    },
+    "build":
+    {
+        "flags": ["-D BLOB_ESP32_WEBSOCKETS"],
+        "includeDir": "include",
+        "srcDir": "src"
+    },
+    "version": "1.0.0"
+}

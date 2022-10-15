@@ -1,5 +1,6 @@
+#ifdef BLOB_FILE
 #include "blob_core.h"
-#include "blob/include/blob.h"
+#include "blob.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -175,3 +176,4 @@ _blob_file_flush()
     fclose(p_file);
     blob_fs.p_current_name = NULL;
 }
+#endif
