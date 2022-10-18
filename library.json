@@ -27,7 +27,6 @@
     },
     "build":
     {
-        "flags": ["-D BLOB_ESP32_WEBSOCKETS"],
         "includeDir": "include",
         "srcDir": "src"
     },
