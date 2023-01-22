@@ -6,27 +6,32 @@ import csv
 import blob_read as br
 import numpy as np
 
-log_dict = dict()
+
+
 def parse_log(log_dir):
-    files = [f for f in os.listdir(log_dir) if f.startswith('log_') and f.endswith('.pkl')]
-    for f in files:
-        with open(os.path.join(log_dir, f), 'rb') as pkl_rd:
-            data = pickle.load(pkl_rd)
-        
-        for i, blob in enumerate(data['data']):
-            ip_addr = blob[:128].decode("utf-8").strip("\x00")
-            if not (ip_addr in log_dict.keys()):
-                log_dict[ip_addr] = []
+    log_dict = dict()
+    if not os.path.exists(os.path.join(log_dir, 'parsed.pkl')):
+        files = [f for f in os.listdir(log_dir) if f.startswith('log_') and f.endswith('.pkl')]
+        for f in files:
+            with open(os.path.join(log_dir, f), 'rb') as pkl_rd:
+                data = pickle.load(pkl_rd)
             
-            blob_deserialized, _ = br.blob_read_node_tree(blob[128:])
+            for i, blob in enumerate(data['data']):
+                ip_addr = blob[:128].decode("utf-8").strip("\x00")
+                if not (ip_addr in log_dict.keys()):
+                    log_dict[ip_addr] = []
+                
+                blob_deserialized, _ = br.blob_read_node_tree(blob[128:])
 
-            blob_unpacked = br.blob_minimal(blob_deserialized)
+                blob_unpacked = br.blob_minimal(blob_deserialized)
 
-            log_dict[ip_addr].append({'data': blob_unpacked, 'time': data['times'][i]})
+                log_dict[ip_addr].append({'data': blob_unpacked, 'time': data['times'][i]})
 
-    with open(os.path.join(log_dir, 'parsed.pkl'), 'wb') as pkl_wt:
-        pickle.dump(log_dict, pkl_wt)
-
+        with open(os.path.join(log_dir, 'parsed.pkl'), 'wb') as pkl_wt:
+            pickle.dump(log_dict, pkl_wt)
+    else:
+        with open(os.path.join(log_dir, 'parsed.pkl'), 'rb') as pkl_rd:
+            log_dict = pickle.load(pkl_rd)
     return log_dict
 
 def to_csv(log_dict, log_dir):
@@ -65,7 +70,7 @@ def to_nc(log_dict, log_dir):
             ncdf_dict[k] = xr.DataArray(vars, dims=('time', f'n{vars.shape[1]}', 'rep'), coords={'time': time})
 
         ds = xr.Dataset(ncdf_dict)
-        ds.to_netcdf(os.path.join(log_dir, f'{ip_addr}.nc'))
+        ds.to_netcdf(os.path.join(log_dir, f'{ip_addr}.nc'), engine='h5netcdf')
 
 def console():
     import argparse

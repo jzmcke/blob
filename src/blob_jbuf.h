@@ -21,4 +21,7 @@ int
 blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_data, size_t *p_n);
 
 int
+blob_jbuf_release_latest_entry(blob_jbuf *p_jbuf);
+
+int
 blob_jbuf_close(blob_jbuf **pp_jbuf);

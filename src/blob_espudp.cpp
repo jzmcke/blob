@@ -36,7 +36,7 @@ typedef struct blob_espudp_state_s
 } blob_espudp_state;
 
 int
-_blob_espudp_init(blob_comm_cfg *p_cfg, int addr0, int addr1, int addr2, int addr3, int port, int n_latency)
+_blob_espudp_init(blob_comm_cfg *p_cfg, int addr0, int addr1, int addr2, int addr3, int port, int n_buf)
 {
     blob_espudp_state *p_espudp;
     blob_jbuf_cfg jbuf_cfg;
@@ -45,34 +45,39 @@ _blob_espudp_init(blob_comm_cfg *p_cfg, int addr0, int addr1, int addr2, int add
     p_espudp->dest_ip_addr = IPAddress(addr0, addr1, addr2, addr3);
     p_espudp->dest_port = port;
 
-    jbuf_cfg.jbuf_len = 2;
+    jbuf_cfg.jbuf_len = n_buf;
     blob_jbuf_init(&p_espudp->p_blob_jbuf, &jbuf_cfg);
-
-    if (p_espudp->p_udp_client->connect(p_espudp->dest_ip_addr, p_espudp->dest_port))
-    {
-        /* Truly asynchronous, so can be executed whenever. Memory population needs to be an atomic operation. */
-        p_espudp->p_udp_client->onPacket([&p_espudp](AsyncUDPPacket packet)
+    p_espudp->p_udp_client->listen(4567);
+    p_espudp->p_udp_client->onPacket([p_espudp](AsyncUDPPacket packet)
         {
             unsigned char *p_data;
-            printf("UDP Packet Type: ");
-            printf(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
-            printf(", From: ");
-            printf(packet.remoteIP().toString().c_str());
-            printf(":");
-            printf("%d", packet.remotePort());
-            printf(", To: ");
-            printf(packet.localIP().toString().c_str());
-            printf(":");
-            printf("%d", packet.localPort());
-            printf(", Length: ");
-            printf("%d", packet.length());
-            printf("\n");
+            // printf("UDP Packet Type: ");
+            // printf(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
+            // printf(", From: ");
+            // printf(packet.remoteIP().toString().c_str());
+            // printf(":");
+            // printf("%d", packet.remotePort());
+            // printf(", To: ");
+            // printf(packet.localIP().toString().c_str());
+            // printf(":");
+            // printf("%d", packet.localPort());
+            // printf(", Length: ");
+            // printf("%d", packet.length());
+            // printf("\n");
 
             p_data = (unsigned char*)calloc(sizeof(unsigned char), packet.length());
             memcpy(p_data, packet.data(), packet.length());
             blob_jbuf_push(p_espudp->p_blob_jbuf, (void*)p_data, packet.length());
         });
-            
+    // if (p_espudp->p_udp_client->connect(p_espudp->dest_ip_addr, p_espudp->dest_port))
+    if (p_espudp->p_udp_client->connect(p_espudp->dest_ip_addr, p_espudp->dest_port))
+    {
+        printf("UDP connection to server established!\n");
+        /* Truly asynchronous, so can be executed whenever. Memory population needs to be an atomic operation. */    
+    }
+    else
+    {
+        printf("UDP connection to server failed!\n");
     }
     p_cfg->p_send_cb = _blob_espudp_send_callback;
     p_cfg->p_send_context = (void*)p_espudp;
@@ -95,7 +100,7 @@ _blob_espudp_send_callback(void *p_context, unsigned char *p_send_data, size_t t
 {
     blob_espudp_state *p_espudp = (blob_espudp_state*)p_context;
     size_t n_write = 0;
-    printf("Total size %u\n", (unsigned int)total_size);
+    // printf("Total sent size %u\n", (unsigned int)total_size);
     std::unique_ptr<AsyncUDPMessage> wt_pkt(new AsyncUDPMessage(total_size));
     wt_pkt->write(p_send_data, total_size);
     // n_write = p_espudp->p_udp_client->writeTo(p_send_data, total_size, p_espudp->dest_ip_addr, p_espudp->dest_port);
@@ -111,11 +116,16 @@ int
 _blob_espudp_rcv_callback(void *p_context, unsigned char **pp_recv_data, size_t *p_recv_total_size)
 {
     blob_espudp_state *p_state = (blob_espudp_state*)p_context;
-    if (NULL != p_state->p_processed_data)
+    if (*p_recv_total_size > 0)
     {
-        free(p_state->p_processed_data);
+        // printf("Total received size %u\n", (unsigned int)*p_recv_total_size);
     }
+    blob_jbuf_release_latest_entry(p_state->p_blob_jbuf);
     blob_jbuf_pull(p_state->p_blob_jbuf, (void**)&p_state->p_processed_data, &p_state->n_data);
+    if (p_state->p_processed_data != NULL)
+    {
+        // printf("Received data size %u\n", (unsigned int)p_state->n_data);
+    }
     *pp_recv_data = p_state->p_processed_data;
     *p_recv_total_size = p_state->n_data;
     return 0;
