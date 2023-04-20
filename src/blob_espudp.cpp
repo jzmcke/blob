@@ -36,13 +36,13 @@ typedef struct blob_espudp_state_s
 } blob_espudp_state;
 
 int
-_blob_espudp_init(blob_comm_cfg *p_cfg, int addr0, int addr1, int addr2, int addr3, int port, int n_buf)
+_blob_espudp_init(blob_comm_cfg *p_cfg, int serv_addr0, int serv_addr1, int serv_addr2, int serv_addr3, int port, int n_buf)
 {
     blob_espudp_state *p_espudp;
     blob_jbuf_cfg jbuf_cfg;
     p_espudp = (blob_espudp_state*)calloc(sizeof(blob_espudp_state), 1);
     p_espudp->p_udp_client = new AsyncUDP();
-    p_espudp->dest_ip_addr = IPAddress(addr0, addr1, addr2, addr3);
+    p_espudp->dest_ip_addr = IPAddress(serv_addr0, serv_addr1, serv_addr2, serv_addr3);
     p_espudp->dest_port = port;
 
     jbuf_cfg.jbuf_len = n_buf;
@@ -51,25 +51,10 @@ _blob_espudp_init(blob_comm_cfg *p_cfg, int addr0, int addr1, int addr2, int add
     p_espudp->p_udp_client->onPacket([p_espudp](AsyncUDPPacket packet)
         {
             unsigned char *p_data;
-            // printf("UDP Packet Type: ");
-            // printf(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
-            // printf(", From: ");
-            // printf(packet.remoteIP().toString().c_str());
-            // printf(":");
-            // printf("%d", packet.remotePort());
-            // printf(", To: ");
-            // printf(packet.localIP().toString().c_str());
-            // printf(":");
-            // printf("%d", packet.localPort());
-            // printf(", Length: ");
-            // printf("%d", packet.length());
-            // printf("\n");
-
             p_data = (unsigned char*)calloc(sizeof(unsigned char), packet.length());
             memcpy(p_data, packet.data(), packet.length());
             blob_jbuf_push(p_espudp->p_blob_jbuf, (void*)p_data, packet.length());
         });
-    // if (p_espudp->p_udp_client->connect(p_espudp->dest_ip_addr, p_espudp->dest_port))
     if (p_espudp->p_udp_client->connect(p_espudp->dest_ip_addr, p_espudp->dest_port))
     {
         printf("UDP connection to server established!\n");

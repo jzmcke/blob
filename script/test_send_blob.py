@@ -9,9 +9,9 @@ import websockets
 LOOP_DELAY_S = 0.01
 
 SAMPLE_RATE_HZ = 16000
-TONE_FREQUENCY_HZ = 300
+TONE_FREQUENCY_HZ = 330
 AMP = 0.01
-N = 160
+N = int(LOOP_DELAY_S * SAMPLE_RATE_HZ)
 i = np.arange(N)
 
 tone = np.sin(2*np.pi * TONE_FREQUENCY_HZ / SAMPLE_RATE_HZ * i)

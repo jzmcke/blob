@@ -39,7 +39,7 @@ def on_message(ws, message):
         times = []
 
 def on_error(ws, error):
-    # print(error)
+    # print(f'Error: {error}')
     pass
 
 def on_close(ws, close_status_code, close_msg):
@@ -61,6 +61,53 @@ def close_up_shop(signal, frame):
     
     b_stop_ws = True
     ws.close()
+
+
+
+def log_while_event(ipaddr, port, event_func):
+    """
+    Starts log to a file in a folder when an event starts, and finishes when then event ends.
+    Args:
+        ipaddr (str): Ip address of the device sending messages
+        port (int): Port of the device sending messages
+        event_func (bool = event_func(message)): A user-defined event function that returns True when the event occurs,
+            False when the event ends, and None when no decision can be made.
+    returns:
+        folder_name: The name of the folder where the log files are stored.
+    """
+    global b_stop_ws
+    global ws
+    global folder_name
+    b_prev_event = False
+    folder_name = 'log_' + datetime.now().strftime("%m_%d_%Y-%H_%M_%S")
+    os.mkdir(folder_name)
+    
+    def on_message_wrapper(ws, message):
+        nonlocal b_prev_event
+        b_event = event_func(message)
+        if not b_event and b_prev_event:
+            close_up_shop(None, None)
+        elif b_event:
+            on_message(ws, message)
+        b_prev_event = b_event
+    
+    # websocket.enableTrace(True)
+    ws = websocket.WebSocketApp("ws://" + ipaddr + ":" + port,
+                              on_open=on_open,
+                              on_message=on_message_wrapper,
+                              on_error=on_error,
+                              on_close=on_close)
+
+
+    ws.run_forever()  # Set dispatcher to automatic reconnection
+    
+    while True:
+        if b_stop_ws:
+            ws.close()
+            break
+
+    return folder_name
+
 
 def log_til_sigint(ipaddr, port):
     global b_stop_ws
