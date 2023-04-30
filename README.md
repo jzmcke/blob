@@ -3,6 +3,7 @@ A generic data serialization and transmission module. Send ints, unsigned ints, 
 
 # Key use-cases
 - Stream data easily between networked devices
+- Control embedded devices easily from the browser, or from your own desktop applications
 - Log data from networked embedded devices into structured datasets (csv, netCDF) incredibly easily
 - Live-plot information dense content at relatively high datarates.
 
