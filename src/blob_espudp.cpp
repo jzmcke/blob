@@ -7,10 +7,13 @@
 #include <memory>
 #include <iostream>
 
+
 extern "C"
 {
-#include "blob_jbuf.h"
+#include "blob_jbuf_frag.h"
 }
+
+#define MTU_SIZE 1400 // This is a requirement of the ESP32 UDP stack
 
 
 int
@@ -33,7 +36,27 @@ typedef struct blob_espudp_state_s
     size_t n_data;
     IPAddress dest_ip_addr;
     int dest_port;
+    size_t max_packet_tx;
+    unsigned char *p_send_data;
+    int seq_num;
+
 } blob_espudp_state;
+
+int
+set_fragment_header(unsigned char *p_send_data, int seq_num, int frag_idx, int total_frags)
+{
+    *((int*)p_send_data) = seq_num;
+    *((int*)p_send_data + 1) = frag_idx;
+    *((int*)p_send_data + 2) = total_frags;
+    return 0;
+}
+
+int
+set_fragment_data(unsigned char *p_send_data, unsigned char *p_data, size_t data_size)
+{
+    memcpy(p_send_data + 3 * sizeof(int), p_data, data_size);
+    return 0;
+}
 
 int
 _blob_espudp_init(blob_comm_cfg *p_cfg, int serv_addr0, int serv_addr1, int serv_addr2, int serv_addr3, int port, int n_buf)
@@ -44,6 +67,9 @@ _blob_espudp_init(blob_comm_cfg *p_cfg, int serv_addr0, int serv_addr1, int serv
     p_espudp->p_udp_client = new AsyncUDP();
     p_espudp->dest_ip_addr = IPAddress(serv_addr0, serv_addr1, serv_addr2, serv_addr3);
     p_espudp->dest_port = port;
+    p_espudp->max_packet_tx = MTU_SIZE;
+    p_espudp->p_send_data = (unsigned char*)calloc(sizeof(unsigned char), p_espudp->max_packet_tx);
+    p_espudp->seq_num = 0;
 
     jbuf_cfg.jbuf_len = n_buf;
     blob_jbuf_init(&p_espudp->p_blob_jbuf, &jbuf_cfg);
@@ -85,15 +111,31 @@ _blob_espudp_send_callback(void *p_context, unsigned char *p_send_data, size_t t
 {
     blob_espudp_state *p_espudp = (blob_espudp_state*)p_context;
     size_t n_write = 0;
-    // printf("Total sent size %u\n", (unsigned int)total_size);
-    std::unique_ptr<AsyncUDPMessage> wt_pkt(new AsyncUDPMessage(total_size));
-    wt_pkt->write(p_send_data, total_size);
-    // n_write = p_espudp->p_udp_client->writeTo(p_send_data, total_size, p_espudp->dest_ip_addr, p_espudp->dest_port);
-    n_write = p_espudp->p_udp_client->sendTo(*wt_pkt, p_espudp->dest_ip_addr, p_espudp->dest_port, TCPIP_ADAPTER_IF_MAX);
-    if (n_write != total_size)
+    size_t n_sent;
+    size_t n_remaining = total_size;
+    size_t n_total_written = 0;
+    int frag_idx = 0;
+    int total_frags = total_size / p_espudp->max_packet_tx + 1;
+    while (n_remaining > 0)
     {
-        printf("Error transmitting packet. Total size attempted to transmit %d, actual size transmitted %d\n", total_size, n_write);
+        n_write = n_remaining > p_espudp->max_packet_tx ? p_espudp->max_packet_tx : n_remaining;
+        {
+            std::unique_ptr<AsyncUDPMessage> wt_pkt(new AsyncUDPMessage(n_write));
+            set_fragment_header(p_espudp->p_send_data, p_espudp->seq_num, frag_idx, total_frags);
+            set_fragment_data(p_espudp->p_send_data, p_send_data + n_total_written, n_write);
+            wt_pkt->write(p_espudp->p_send_data, n_write);
+            n_sent = p_espudp->p_udp_client->sendTo(*wt_pkt, p_espudp->dest_ip_addr, p_espudp->dest_port, TCPIP_ADAPTER_IF_MAX);
+        }
+
+        if (n_write != n_sent)
+        {
+            printf("Error transmitting packet. Total size attempted to transmit %d, actual size transmitted %d\n", total_size, n_write);
+        }
+        n_remaining = n_remaining - n_write;
+        n_total_written = total_size - n_remaining;
+        frag_idx++;
     }
+    p_espudp->seq_num++;
     return 0;
 };
 
@@ -105,7 +147,6 @@ _blob_espudp_rcv_callback(void *p_context, unsigned char **pp_recv_data, size_t 
     {
         // printf("Total received size %u\n", (unsigned int)*p_recv_total_size);
     }
-    blob_jbuf_release_latest_entry(p_state->p_blob_jbuf);
     blob_jbuf_pull(p_state->p_blob_jbuf, (void**)&p_state->p_processed_data, &p_state->n_data);
     if (p_state->p_processed_data != NULL)
     {

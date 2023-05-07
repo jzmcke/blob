@@ -1,3 +1,5 @@
+
+#if 0
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -153,3 +155,4 @@ blob_jbuf_close(blob_jbuf **pp_jbuf)
     free((*pp_jbuf)->p_size);
     free(*pp_jbuf);
 }
+#endif
