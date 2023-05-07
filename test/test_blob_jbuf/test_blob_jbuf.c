@@ -33,6 +33,7 @@ main(int argc, char **argv)
     int frag_idx = 0;
     int ret = 0;
     size_t out_n = 0;
+    int frag_start_idx = 0;
     blob_jbuf *p_jbuf = NULL;
 
     for (seq_num=0; seq_num<N_BLOB_TREES; seq_num++)
@@ -46,21 +47,35 @@ main(int argc, char **argv)
     jbuf_cfg.jbuf_len = JBUF_LEN;
     ret = blob_jbuf_init(&p_jbuf, &jbuf_cfg);
     assert(ret == BLOB_JBUF_OK);
-
+    
     for (seq_num=0; seq_num<N_BLOB_TREES; seq_num++)
     {
+        printf("Writing %d %d %d\n", *((int*)aap_blob_trees[seq_num][0] + 3), *((int*)aap_blob_trees[seq_num][1] + 3), *((int*)aap_blob_trees[seq_num][2] + 3));
         // push TOTAL_FRAG_CNTs for each pull event
-        for (frag_idx=0; frag_idx<TOTAL_FRAG_CNT; frag_idx++)
+        if (seq_num != 10) // Should pull NULL here
         {
-            ret = blob_jbuf_push(p_jbuf, aap_blob_trees[seq_num][frag_idx], 4 * sizeof(int));
-            assert(ret == BLOB_JBUF_OK);
+             for (frag_idx=0; frag_idx<TOTAL_FRAG_CNT; frag_idx++)
+            {
+                if (!((seq_num == 15) && (frag_idx == 1)))
+                {
+                    ret = blob_jbuf_push(p_jbuf, aap_blob_trees[seq_num][(frag_start_idx + frag_idx) % TOTAL_FRAG_CNT], 4 * sizeof(int));
+                }                
+            }
         }
-
+       
+        frag_start_idx++;
         // Pull after every push
         ret = blob_jbuf_pull(p_jbuf, &p_out, &out_n);
+        if (NULL != p_out)
+        {
+            printf("Reading %d %d %d\n", *((int*)p_out), *((int*)p_out + 1), *((int*)p_out + 2));
+        }
     }
 
-
+    while (p_out != NULL)
+    {
+        ret = blob_jbuf_pull(p_jbuf, &p_out, &out_n);
+    }
 
 
     return 0;

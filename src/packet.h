@@ -40,7 +40,7 @@ int
 packet_is_fragment_empty(packet *p_packet, int frag_idx);
 
 int
-packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data, int frag_idx);
+packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data);
 
 int
 packet_is_full(packet *p_packet);

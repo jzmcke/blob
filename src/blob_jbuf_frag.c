@@ -22,7 +22,7 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
 {
     blob_jbuf *p_jbuf;
     p_jbuf = (blob_jbuf*)calloc(1, sizeof(blob_jbuf));
-    p_jbuf->p_packets = (packet*)calloc(p_jbuf_cfg->jbuf_len, sizeof(packet*));
+    p_jbuf->p_packets = (packet*)calloc(p_jbuf_cfg->jbuf_len, sizeof(packet));
     p_jbuf->buffer_fullness = 0;
     p_jbuf->b_exit_emptiness = 1;
     p_jbuf->b_exit_fullness = 0;
@@ -40,7 +40,7 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
         packet_init(&p_jbuf->p_packets[i], 1);
     }
     p_jbuf->push_idx = 0;
-    p_jbuf->pull_idx = p_jbuf->push_idx;
+    p_jbuf->pull_idx = p_jbuf->jbuf_len - 1;
     printf("jbuf_len: %d\n", p_jbuf->jbuf_len);
     printf("jbuf_latency: %d\n", p_jbuf->latency);
     *pp_jbuf = p_jbuf;
@@ -104,7 +104,7 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     if (   (packet_is_fragment_empty(p_packet, frag_idx))
         && (!p_jbuf->b_exit_fullness))
     {
-        packet_add_fragment_data(p_packet, p_fragment_data, n - 3*sizeof(int), frag_idx);
+        packet_add_fragment_data(p_packet, p_new_data, n);
     }
     else
     {
@@ -142,7 +142,8 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     int ret = BLOB_JBUF_OK;
     /* This function gets called only once we are confident the latest packet isnt required anymore!
     Assumes that receiver has already pulled the latest packet and used it. */
-    
+    *pp_new_data = NULL;
+    *p_n = 0;
     if (!p_jbuf->b_exit_emptiness)
     {
         /* This condition is true if the buffer has sufficient packets.
@@ -174,18 +175,13 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
             printf("Error, attempted pull when buffer already empty!\n");
             ret = BLOB_JBUF_ERR;
         }
+        if (packet_is_full(&p_jbuf->p_packets[p_jbuf->pull_idx]))
+        {
+            *pp_new_data = p_jbuf->p_packets[p_jbuf->pull_idx].p_unfragmented_data;
+            *p_n = p_jbuf->p_packets[p_jbuf->pull_idx].unfragmented_size;
+        }
     }
-
-    if (packet_is_full(&p_jbuf->p_packets[p_jbuf->pull_idx]))
-    {
-        *pp_new_data = p_jbuf->p_packets[p_jbuf->pull_idx].p_unfragmented_data;
-        *p_n = p_jbuf->p_packets[p_jbuf->pull_idx].unfragmented_size;
-    }
-    else
-    {
-        *pp_new_data = NULL;
-        *p_n = 0;
-    }
+    
     return ret;
 }
 

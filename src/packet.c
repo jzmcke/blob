@@ -83,32 +83,54 @@ packet_is_fragment_empty(packet *p_packet, int frag_idx)
 }
 
 int
-packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data, int frag_idx)
+packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data)
 {
-    // Allocate space for the fragment if it does not already exist, otherwise just copy the data
-    if (p_packet->p_fragments[frag_idx].p_fragment_data == NULL)
-    {
-        size_t prev_size = p_packet->unfragmented_size;
-        size_t i_data = 0;
-        unsigned char *p_new_unfragmented_data = NULL;
+    int frag_idx = *((int*)p_data + 1);
 
-        p_new_unfragmented_data = (unsigned char*)malloc(prev_size + n_data);
-        p_packet->unfragmented_size = prev_size + n_data;
-
-        for (int i=0; i<p_packet->total_fragments; i++)
-        {
-            memcpy(p_new_unfragmented_data + n_data, p_packet->p_fragments[i].p_fragment_data, p_packet->p_fragments[i].size);
-            i_data += p_packet->p_fragments[i].size;
-        }
-        free(p_packet->p_unfragmented_data);
-        p_packet->p_unfragmented_data = p_new_unfragmented_data;
-        p_packet->p_fragments[frag_idx].p_fragment_data = p_packet->p_unfragmented_data + i_data;
-    }
-    
-    memcpy(p_packet->p_fragments[frag_idx].p_fragment_data, p_data, n_data);
-    p_packet->p_fragments[frag_idx].b_occupied = 1;
-    p_packet->p_fragments[frag_idx].size = n_data;
     p_packet->received_fragments++;
+    // Allocate space for the fragment if it does not already exist, otherwise just copy the data
+    if (p_packet->p_unfragmented_data == NULL)
+    {
+        if (p_packet->p_fragments[frag_idx].p_fragment_data != NULL)
+        {
+            // This condition will arise if a packet is received twice. In this case, we need to free the old data.
+            free(p_packet->p_fragments[frag_idx].p_fragment_data);
+        }
+        p_packet->p_fragments[frag_idx].p_fragment_data = (unsigned char *)((int*)p_data + 3);
+        p_packet->p_fragments[frag_idx].size = n_data - 3 * sizeof(int); // The first 3 elements are seq_num, frag_idx, and total_frags
+
+        // We have received all the packets, so we can finally allocate space for the unfragmented data
+        if (p_packet->received_fragments == p_packet->total_fragments)
+        {
+            size_t i_data = 0;
+            p_packet->unfragmented_size = 0;
+            for (int i=0; i<p_packet->total_fragments; i++)
+            {
+                p_packet->unfragmented_size += p_packet->p_fragments[i].size;
+            }
+            p_packet->p_unfragmented_data = (unsigned char*)malloc(p_packet->unfragmented_size);
+            for (int i=0; i<p_packet->total_fragments; i++)
+            {
+                /* Copy the fragmented data onto the unfragmented memory in the correct position. */
+                memcpy(p_packet->p_unfragmented_data + i_data, p_packet->p_fragments[i].p_fragment_data, p_packet->p_fragments[i].size);
+                free(p_packet->p_fragments[i].p_fragment_data - 3 * sizeof(int));
+
+                /* For future frames, the memory has already been assigned. */
+                p_packet->p_fragments[i].p_fragment_data = p_packet->p_unfragmented_data + i_data;
+
+                i_data += p_packet->p_fragments[i].size;
+            }
+        }
+    }
+    else
+    {
+        memcpy(p_packet->p_fragments[frag_idx].p_fragment_data, (unsigned char *)((int*)p_data + 3), n_data - 3 * sizeof(int));
+        free(p_data);
+    }
+
+    p_packet->p_fragments[frag_idx].b_occupied = 1;
+    p_packet->p_fragments[frag_idx].size = n_data - 3 * sizeof(int);
+
     return PACKET_OK;
 }
 
