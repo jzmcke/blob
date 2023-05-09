@@ -18,11 +18,20 @@ typedef struct packet_s
     unsigned char *p_unfragmented_data;
     size_t unfragmented_size;
     int seq_num;
+    void (*deallocate_callback)(unsigned char *p_data, void *p_context);
+    void *p_deallocate_context;
 } packet;
+
+typedef struct packet_cfg_s
+{
+    int total_fragments;
+    void (*deallocate_callback)(unsigned char *p_data, void *p_context);
+    void *p_context;
+} packet_cfg;
 
 
 int
-packet_init(packet *p_packet, int total_fragments);
+packet_init(packet *p_packet, packet_cfg *p_cfg);
 
 int
 packet_close(packet *p_packet);
@@ -34,7 +43,7 @@ int
 packet_shallow_empty(packet *p_packet);
 
 int
-packet_reset(packet *p_packet, int total_fragments);
+packet_reset(packet *p_packet, packet_cfg *p_cfg);
 
 int
 packet_is_fragment_empty(packet *p_packet, int frag_idx);

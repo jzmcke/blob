@@ -2,18 +2,21 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 int
-packet_init(packet *p_packet, int total_fragments)
+packet_init(packet *p_packet, packet_cfg *p_cfg)
 {
     p_packet->p_fragments = NULL;
-    p_packet->total_fragments = total_fragments;
+    p_packet->total_fragments = p_cfg->total_fragments;
     p_packet->received_fragments = 0;
     p_packet->p_unfragmented_data = NULL;
     p_packet->unfragmented_size = 0;
+    p_packet->deallocate_callback = p_cfg->deallocate_callback;
+    p_packet->p_deallocate_context = p_cfg->p_context;
     p_packet->seq_num = -1;
 
-    p_packet->p_fragments = (fragment*)malloc(total_fragments * sizeof(fragment));
-    for (int i=0; i<total_fragments; i++)
+    p_packet->p_fragments = (fragment*)malloc(p_packet->total_fragments * sizeof(fragment));
+    for (int i=0; i<p_packet->total_fragments; i++)
     {
         p_packet->p_fragments[i].p_fragment_data = NULL;
         p_packet->p_fragments[i].size = 0;
@@ -61,12 +64,13 @@ packet_shallow_empty(packet *p_packet)
 
 
 int
-packet_reset(packet *p_packet, int total_fragments)
+packet_reset(packet *p_packet, packet_cfg *p_cfg)
 {
-    if (p_packet->total_fragments != total_fragments)
+    if (p_packet->total_fragments != p_cfg->total_fragments)
     {
         packet_deep_empty(p_packet);
-        packet_init(p_packet, total_fragments);
+        
+        packet_init(p_packet, p_cfg);
     }
     else
     {
@@ -94,7 +98,10 @@ packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data)
         if (p_packet->p_fragments[frag_idx].p_fragment_data != NULL)
         {
             // This condition will arise if a packet is received twice. In this case, we need to free the old data.
-            free(p_packet->p_fragments[frag_idx].p_fragment_data);
+            if (NULL != p_packet->deallocate_callback)
+            {
+                p_packet->deallocate_callback(p_packet->p_fragments[frag_idx].p_fragment_data - 3 * sizeof(int), p_packet->p_deallocate_context);
+            }
         }
         p_packet->p_fragments[frag_idx].p_fragment_data = (unsigned char *)((int*)p_data + 3);
         p_packet->p_fragments[frag_idx].size = n_data - 3 * sizeof(int); // The first 3 elements are seq_num, frag_idx, and total_frags
@@ -113,8 +120,10 @@ packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data)
             {
                 /* Copy the fragmented data onto the unfragmented memory in the correct position. */
                 memcpy(p_packet->p_unfragmented_data + i_data, p_packet->p_fragments[i].p_fragment_data, p_packet->p_fragments[i].size);
-                free(p_packet->p_fragments[i].p_fragment_data - 3 * sizeof(int));
-
+                if (NULL != p_packet->deallocate_callback)
+                {
+                    p_packet->deallocate_callback(p_packet->p_fragments[i].p_fragment_data - 3 * sizeof(int), p_packet->p_deallocate_context);
+                }
                 /* For future frames, the memory has already been assigned. */
                 p_packet->p_fragments[i].p_fragment_data = p_packet->p_unfragmented_data + i_data;
 
@@ -125,7 +134,10 @@ packet_add_fragment_data(packet *p_packet, unsigned char *p_data, size_t n_data)
     else
     {
         memcpy(p_packet->p_fragments[frag_idx].p_fragment_data, (unsigned char *)((int*)p_data + 3), n_data - 3 * sizeof(int));
-        free(p_data);
+        if (NULL != p_packet->deallocate_callback)
+        {
+            p_packet->deallocate_callback(p_data, p_packet->p_deallocate_context);
+        }
     }
 
     p_packet->p_fragments[frag_idx].b_occupied = 1;

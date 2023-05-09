@@ -15,6 +15,7 @@ struct blob_jbuf_s
     int          latency;
     int          b_exit_emptiness;
     int          b_exit_fullness;
+    packet_cfg   packet_cfg;
 };
 
 int
@@ -28,6 +29,10 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
     p_jbuf->b_exit_fullness = 0;
     p_jbuf->jbuf_len = p_jbuf_cfg->jbuf_len;
     p_jbuf->latency = p_jbuf->jbuf_len / 2;
+
+    p_jbuf->packet_cfg.deallocate_callback = p_jbuf_cfg->deallocate_callback;
+    p_jbuf->packet_cfg.p_context = p_jbuf_cfg->p_context;
+    p_jbuf->packet_cfg.total_fragments = 1;
     if (p_jbuf_cfg->jbuf_len < 2)
     {
         blob_jbuf_close(&p_jbuf);
@@ -37,7 +42,7 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
 
     for (int i=0; i<p_jbuf_cfg->jbuf_len; i++)
     {
-        packet_init(&p_jbuf->p_packets[i], 1);
+        packet_init(&p_jbuf->p_packets[i], &p_jbuf->packet_cfg);
     }
     p_jbuf->push_idx = 0;
     p_jbuf->pull_idx = p_jbuf->jbuf_len - 1;
@@ -61,6 +66,7 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     int seq_num = p_new_data_ints[0];
     int frag_idx = p_new_data_ints[1];
     int total_fragments = p_new_data_ints[2];
+
     unsigned char *p_fragment_data = (unsigned char *)&p_new_data_ints[3];
     packet *p_packet = NULL;
 
@@ -72,22 +78,24 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     // This line need to be here, since the number of fragments is not known until the first fragment is received.
     if (p_packet->total_fragments != total_fragments)
     {
-        packet_reset(p_packet, total_fragments);
+        p_jbuf->packet_cfg.total_fragments = total_fragments;
+        packet_reset(p_packet, &p_jbuf->packet_cfg);
     }
 
     if (packet_is_full(p_packet))
     {
-        packet_reset(p_packet, total_fragments);
+        p_jbuf->packet_cfg.total_fragments = total_fragments;
+        packet_reset(p_packet, &p_jbuf->packet_cfg);
         p_jbuf->buffer_fullness--;
         ret = BLOB_JBUF_DROPPED_PACKET;
     }
-
     // This < operation will fall over if the sequence number wraps around, can make more robust by using a modulo operation.
     // This stops older packets from overwriting newer packets (a != would not suffice)
     if (  (p_packet->seq_num != -1)
         &&(p_packet->seq_num  < seq_num))
     {
-        packet_reset(p_packet, total_fragments);
+        p_jbuf->packet_cfg.total_fragments = total_fragments;
+        packet_reset(p_packet, &p_jbuf->packet_cfg);
         printf("Overwrote packet at idx %d!\n", p_jbuf->push_idx);
         ret = BLOB_JBUF_OVERWROTE_PACKET;
     }
@@ -99,19 +107,20 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     }
 
     packet_set_seq_num(p_packet, seq_num);
-
+    
     /* Only add a fragment if the buffer is not attempting latency recovery, the sequence numbers are a match, and there is no data already in the buffer.*/
     if (   (packet_is_fragment_empty(p_packet, frag_idx))
         && (!p_jbuf->b_exit_fullness))
     {
         packet_add_fragment_data(p_packet, p_new_data, n);
+        
     }
     else
     {
         printf("Dropped fragment at idx %d!\n", p_jbuf->push_idx);
         ret = BLOB_JBUF_DROPPED_FRAGMENT;
     }
-
+    
     if (packet_is_full(p_packet))
     {
         p_jbuf->buffer_fullness++;
@@ -156,7 +165,8 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
             // the buffer fullness is only incremented when a full packet has been received.
         }
         // Start by freeing the last packet on the buffer.
-        packet_reset(&p_jbuf->p_packets[p_jbuf->pull_idx], p_jbuf->p_packets[p_jbuf->pull_idx].total_fragments);
+        p_jbuf->packet_cfg.total_fragments =  p_jbuf->p_packets[p_jbuf->pull_idx].total_fragments;
+        packet_reset(&p_jbuf->p_packets[p_jbuf->pull_idx], &p_jbuf->packet_cfg);
         p_jbuf->pull_idx = (p_jbuf->pull_idx + 1) % p_jbuf->jbuf_len;        
 
         if (p_jbuf->buffer_fullness == 0)
