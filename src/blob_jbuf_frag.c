@@ -220,3 +220,4 @@ blob_jbuf_close(blob_jbuf **pp_jbuf)
     free(*pp_jbuf);
     return BLOB_JBUF_OK;
 }
+#
