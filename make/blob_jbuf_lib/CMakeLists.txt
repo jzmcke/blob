@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
+# To execute cmake from the command line, use the following command from a build directory created next to CMakelists.txt:
+# cmake -G "Visual Studio 16 2019" -A x64 ..
+# Then to build the project, use the following command:
+# cmake --build . --config Release
+
 # Set the project name and version
 project(mylib VERSION 1.0.0 LANGUAGES C)
 
@@ -24,3 +29,7 @@ install(TARGETS blob_jbuf_lib
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin)
+
+if (WIN32)
+        target_compile_definitions(blob_jbuf_lib PRIVATE BLOB_WINDOWS_DLL)
+endif (WIN32)

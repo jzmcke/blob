@@ -16,18 +16,32 @@ typedef struct blob_jbuf_cfg_s
     void *p_context;
 } blob_jbuf_cfg;
 
+#ifdef BLOB_WINDOWS_DLL
 __declspec(dllexport)
+#endif
 int
 blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg);
 
+#ifdef BLOB_WINDOWS_DLL
 __declspec(dllexport)
+#endif
 int
 blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n);
 
+#ifdef BLOB_WINDOWS_DLL
 __declspec(dllexport)
+#endif
 int
 blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_data, size_t *p_n);
 
+#ifdef BLOB_WINDOWS_DLL
 __declspec(dllexport)
+#endif
+int
+blob_jbuf_get_n_fragments(blob_jbuf *p_jbuf);
+
+#ifdef BLOB_WINDOWS_DLL
+__declspec(dllexport)
+#endif
 int
 blob_jbuf_close(blob_jbuf **pp_jbuf);

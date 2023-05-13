@@ -16,6 +16,7 @@ struct blob_jbuf_s
     int          b_exit_emptiness;
     int          b_exit_fullness;
     packet_cfg   packet_cfg;
+    int          n_fragments;
 };
 
 int
@@ -29,6 +30,7 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
     p_jbuf->b_exit_fullness = 0;
     p_jbuf->jbuf_len = p_jbuf_cfg->jbuf_len;
     p_jbuf->latency = p_jbuf->jbuf_len / 2;
+    p_jbuf->n_fragments = 1;
 
     p_jbuf->packet_cfg.deallocate_callback = p_jbuf_cfg->deallocate_callback;
     p_jbuf->packet_cfg.p_context = p_jbuf_cfg->p_context;
@@ -78,6 +80,7 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     // This line need to be here, since the number of fragments is not known until the first fragment is received.
     if (p_packet->total_fragments != total_fragments)
     {
+        p_jbuf->n_fragments = total_fragments > p_jbuf->n_fragments ? total_fragments : p_jbuf->n_fragments;
         p_jbuf->packet_cfg.total_fragments = total_fragments;
         packet_reset(p_packet, &p_jbuf->packet_cfg);
     }
@@ -143,6 +146,12 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     return ret;
 }
 
+int
+blob_jbuf_get_n_fragments(blob_jbuf *p_jbuf)
+{
+    return p_jbuf->n_fragments;
+}
+
 
 /* Pull an element from the buffer */
 int
@@ -153,6 +162,7 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     Assumes that receiver has already pulled the latest packet and used it. */
     *pp_new_data = NULL;
     *p_n = 0;
+
     if (!p_jbuf->b_exit_emptiness)
     {
         /* This condition is true if the buffer has sufficient packets.
