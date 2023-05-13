@@ -91,6 +91,13 @@ def blob_flatten(blob_minimal):
     return dict((k, v) for k, v in zip(var_names, var_vals))
 
 
+class BlobReader:
+    def read(data):
+        node_tree, new_data = blob_read_node_tree(data)
+        blob = blob_minimal(node_tree)
+        blob = blob_flatten(blob)
+        return blob
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

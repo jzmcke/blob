@@ -49,3 +49,29 @@ def blob_write_node_tree(node_tree):
     
     return binary_data
 
+import numpy as np
+
+
+class BlobWriter:
+    def __init__(self, root_name, vars, tx_obj=None):
+        self.dict_tx = {'name': root_name, 'data': {} }
+        data = {'n_repetitions': 0, 'n_variables': len(vars), 'vars': {{v : { 'type': 0, 'len': 1, 'value': np.array([0]) } } for v in vars}}
+        self.dict_tx['data'] = data
+        self.tx_obj = tx_obj
+
+    def add_var(self, name, val):
+        if val.dtype == np.int32:
+            type = 0
+        elif val.dtype == np.uint32:
+            type = 2
+        elif val.dtype == np.float32:
+            type = 1
+
+        self.dict_tx['data']['vars'][name] = {'type': type, 'len': len(val), 'value': np.zeros((len(val), 1))}
+    
+    def flush(self):
+        data = blob_write_node_tree(self.dict_tx)
+        if self.tx_obj is not None:
+            self.tx_obj.send(data)
+
+        return data
