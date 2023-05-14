@@ -99,9 +99,10 @@ _blob_espudp_send_callback(void *p_context, unsigned char *p_send_data, size_t t
     size_t n_sent = 0;
 
     blob_frag_tx_begin_packet(p_espudp->p_blob_frag_tx, p_send_data, total_size);
-    do 
+    blob_frag_tx_next_packet(p_espudp->p_blob_frag_tx, &p_tx_data, &n_write);
+
+    while (NULL != p_tx_data)
     {
-        blob_frag_tx_next_packet(p_espudp->p_blob_frag_tx, &p_tx_data, &n_write);
         std::unique_ptr<AsyncUDPMessage> wt_pkt(new AsyncUDPMessage(n_write));
         wt_pkt->write(p_espudp->p_send_data, n_write);
         n_sent = p_espudp->p_udp_client->sendTo(*wt_pkt, p_espudp->dest_ip_addr, p_espudp->dest_port, TCPIP_ADAPTER_IF_MAX);
@@ -110,7 +111,8 @@ _blob_espudp_send_callback(void *p_context, unsigned char *p_send_data, size_t t
         {
             printf("Error transmitting packet. Total size attempted to transmit %d, actual size transmitted %d\n", total_size, n_write);
         }
-    } while (NULL != p_tx_data);
+        blob_frag_tx_next_packet(p_espudp->p_blob_frag_tx, &p_tx_data, &n_write);
+    } 
     return 0;
 };
 
