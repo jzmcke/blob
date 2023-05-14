@@ -1,6 +1,19 @@
 #include "blob_frag_tx.h"
 #include <stddef.h>
+#include <stdlib.h>
 
+struct blob_frag_tx_s
+{
+    unsigned char *p_data;
+    size_t data_size;
+    size_t n_remaining;
+    size_t n_total_written;
+    size_t frag_size;
+    int frag_idx;
+    int seq_num;
+    int n_frags;
+    unsigned char *p_out_buffer;
+};
 
 int
 set_fragment_header(blob_frag_tx *p_blob_frag_tx, int seq_num, int frag_idx, int total_frags)
@@ -28,19 +41,22 @@ blob_frag_tx_init(blob_frag_tx **pp_blob_frag_tx, size_t frag_size)
     p_blob_frag_tx->frag_size = frag_size;
     // Allocate memory for the output buffer + the packet header: seq num, frag idx, n fragss
     p_blob_frag_tx->p_out_buffer = (unsigned char*)malloc(frag_size + 3 *sizeof(int));
+    p_blob_frag_tx->seq_num = 0;
 
     *pp_blob_frag_tx = p_blob_frag_tx;
+    
     return 0;
 }
 
 int
-blob_frag_tx_begin_packet(blob_frag_tx *p_blob_frag_tx, unsigned char *p_data, size_t n)
+blob_frag_tx_begin_packet(blob_frag_tx *p_blob_frag_tx,
+                          unsigned char *p_data,
+                          size_t n)
 {
-    p_blob_frag_tx->n_frags = n / p_blob_frag_tx->frag_size + 1;
+    p_blob_frag_tx->n_frags = (int)(n / p_blob_frag_tx->frag_size) + 1;
     p_blob_frag_tx->p_data = p_data;
     p_blob_frag_tx->data_size = n;
     p_blob_frag_tx->frag_idx = 0;
-    p_blob_frag_tx->seq_num = 0;
     p_blob_frag_tx->n_remaining = n;
     p_blob_frag_tx->n_total_written = 0;
     return 0;

@@ -11,7 +11,7 @@ project(mylib VERSION 1.0.0 LANGUAGES C)
 # Set the C standard to C99
 set(CMAKE_C_STANDARD 99)
 
-set(SOURCES ../../src/blob_jbuf_frag.c ../../src/packet.c)
+set(SOURCES ../../src/blob_jbuf_frag.c ../../src/packet.c ../../src/blob_frag_tx.c)
 
 # Create a shared library
 add_library(blob_jbuf_lib SHARED ${SOURCES})

@@ -53,25 +53,28 @@ import numpy as np
 
 
 class BlobWriter:
-    def __init__(self, root_name, vars, tx_obj=None):
+    def __init__(self, root_name, vars):
         self.dict_tx = {'name': root_name, 'data': {} }
-        data = {'n_repetitions': 0, 'n_variables': len(vars), 'vars': {{v : { 'type': 0, 'len': 1, 'value': np.array([0]) } } for v in vars}}
+        data = {'n_repetitions': 0, 'n_variables': len(vars), 'vars': {v : { 'type': 0, 'len': 1, 'value': np.array([[0]]).T } for v in vars}}
         self.dict_tx['data'] = data
-        self.tx_obj = tx_obj
+        
+        for v in vars:
+            setattr(self, v, np.array([0]))
+    
+    def __setattr__(self, key, value):
+        if key not in {"dict_tx"}:
+            if value.dtype == np.int32:
+                type = 0
+            elif value.dtype == np.uint32:
+                type = 2
+            else:
+                value = value.astype(np.float32)
+                type = 1
 
-    def add_var(self, name, val):
-        if val.dtype == np.int32:
-            type = 0
-        elif val.dtype == np.uint32:
-            type = 2
-        elif val.dtype == np.float32:
-            type = 1
-
-        self.dict_tx['data']['vars'][name] = {'type': type, 'len': len(val), 'value': np.zeros((len(val), 1))}
+            self.dict_tx['data']['vars'][key] = {'type': type, 'len': len(value), 'value': np.array([value]).T}
+        super().__setattr__(key, value)
+        
     
     def flush(self):
         data = blob_write_node_tree(self.dict_tx)
-        if self.tx_obj is not None:
-            self.tx_obj.send(data)
-
         return data

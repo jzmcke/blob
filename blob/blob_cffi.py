@@ -1,8 +1,43 @@
 from cffi import FFI
 import os
 
-import struct
+import copy
 
+class BlobFrag:
+    def __init__(self, frag_size):
+        self.ffi = FFI()
+        self.ffi.cdef("""
+            typedef struct blob_frag_tx_s blob_frag_tx;
+
+            int
+            blob_frag_tx_init(blob_frag_tx **pp_blob_frag_tx, size_t frag_size);
+
+            int
+            blob_frag_tx_begin_packet(blob_frag_tx *p_blob_frag_tx, unsigned char *p_data, size_t n);
+
+            int
+            blob_frag_tx_next_packet(blob_frag_tx *p_blob_frag_tx, unsigned char **pp_data, size_t *p_n);
+        """)
+        self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..\make\blob_jbuf_lib\build\bin\Release\blob_jbuf_lib.dll"))
+        
+        self.frag = self.ffi.new("blob_frag_tx **")
+        res = self.lib.blob_frag_tx_init(self.frag, frag_size)
+    
+    def fragment(self, data):
+        send_frags = []
+        
+        self.lib.blob_frag_tx_begin_packet(self.frag[0], bytes(data), len(data))
+        p_out = self.ffi.new("unsigned char **")
+        p_n = self.ffi.new("size_t *")
+
+        while True:
+            res = self.lib.blob_frag_tx_next_packet(self.frag[0], p_out, p_n)
+            if p_out[0] == self.ffi.NULL:
+                break
+            else:
+                send_frags.append(bytes(self.ffi.buffer(p_out[0], p_n[0])))
+
+        return send_frags
 
 class BlobJBUF:
     BLOB_JBUF_TICKLESS_NO_DATA = 5
@@ -23,7 +58,7 @@ class BlobJBUF:
         """)
 
         # Load the shared library
-        self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"build\bin\Release\blob_jbuf_lib.dll"))
+        self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..\make\blob_jbuf_lib\build\bin\Release\blob_jbuf_lib.dll"))
         
         self.jbuf = self.ffi.new("blob_jbuf **")
         self.cfg = self.ffi.new("blob_jbuf_cfg *")
