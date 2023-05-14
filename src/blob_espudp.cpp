@@ -6,11 +6,11 @@
 
 #include <memory>
 #include <iostream>
-#include "blob_frag_tx.h"
 
 
 extern "C"
 {
+#include "blob_frag_tx.h"
 #include "blob_jbuf_frag.h"
 }
 
@@ -104,7 +104,7 @@ _blob_espudp_send_callback(void *p_context, unsigned char *p_send_data, size_t t
     while (NULL != p_tx_data)
     {
         std::unique_ptr<AsyncUDPMessage> wt_pkt(new AsyncUDPMessage(n_write));
-        wt_pkt->write(p_espudp->p_send_data, n_write);
+        wt_pkt->write(p_tx_data, n_write);
         n_sent = p_espudp->p_udp_client->sendTo(*wt_pkt, p_espudp->dest_ip_addr, p_espudp->dest_port, TCPIP_ADAPTER_IF_MAX);
 
         if (n_write != n_sent)

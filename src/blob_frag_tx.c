@@ -1,6 +1,6 @@
 #include "blob_frag_tx.h"
-#include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct blob_frag_tx_s
 {

@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 typedef struct blob_frag_tx_s blob_frag_tx;
 
 #ifdef BLOB_WINDOWS_DLL
