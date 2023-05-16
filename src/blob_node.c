@@ -93,7 +93,15 @@ blob_node_retrieve_unsigned_int_a(blob_node *p_node, const char *var_name, const
 void
 blob_node_get_data(blob_node *p_node, unsigned char **pp_data, size_t *p_base_blob_size)
 {
-    blob_core_get_data(p_node->p_blob, pp_data, p_base_blob_size);
+    if (NULL != p_node->p_blob)
+    {
+        blob_core_get_data(p_node->p_blob, pp_data, p_base_blob_size);
+    }
+    else
+    {
+        *pp_data = NULL;
+        *p_base_blob_size = 0;
+    }
 }
 
 int

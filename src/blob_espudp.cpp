@@ -2,7 +2,7 @@
 #ifdef BLOB_ESP32_UDP
 #include "AsyncUDP.h"
 #include "../include/blob.h"
-#include "blob_comm.h"
+#include "include/blob_comm.h"
 
 #include <memory>
 #include <iostream>

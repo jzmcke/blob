@@ -1,7 +1,10 @@
-#include "blob/include/blob.h"
 #include <assert.h>
 #include <math.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "include/blob.h"
 
 #define NUM_IN_FIRST_ARRAY  (4)
 #define NUM_IN_SECOND_ARRAY (7)
@@ -14,7 +17,6 @@ func_top(void)
     int ret;
     int a_array_first[NUM_IN_FIRST_ARRAY];
     int a_array_second[NUM_IN_SECOND_ARRAY];
-    float a_array_third[NUM_IN_THIRD_ARRAY];
     
     static int start = 0;
     BLOB_START("top");
@@ -26,10 +28,7 @@ func_top(void)
     {
         a_array_second[i] = start + i;
     }
-    for (int i=0; i<NUM_IN_THIRD_ARRAY; i++)
-    {
-        a_array_third[i] = (float)(start + i);
-    }
+
     ret = BLOB_INT_A("first_array", a_array_first, NUM_IN_FIRST_ARRAY);
     assert(ret==0);
     ret = BLOB_INT_A("second_array", a_array_second, NUM_IN_SECOND_ARRAY);
@@ -65,48 +64,35 @@ func_mid(void)
 int
 main(int argc, char **argv)
 {
-    int i = 0;
     int j = 0;
-    int jval[NELEM] = {0};
-    int count = 0;
-    float jval_squared[NELEM] = {0};
+    unsigned int abs_j = 0;
+    int jval = 0;
+    float jval_squared = 0.0f;
     float jval_cubed = 0.0f;
-    BLOB_SOCKET_INIT("172.21.143.247", 8000);
-    
+
+    if (argc != 2)
+    {
+        printf("Usage: %s <blob_server_ip>\n", argv[0]);
+    }
+
+    BLOB_INIT(argv[1], 8000);
     while (1)
     {
+        abs_j = abs(jval);
         BLOB_START("main");
-        BLOB_INT_A("jval", jval, NELEM);
-        jval_cubed = 1.0 * (*jval) * (*jval) * (*jval) / (NELEM * NELEM);
-        BLOB_FLOAT_A("jval_squared", &jval_squared, NELEM);
-        BLOB_FLOAT_A("jval_cubed", &jval_cubed, NELEM);
-        BLOB_START("outer");
-        for (i=0; i<10; i++)
-        {
-            BLOB_INT_A("iteration", &i, 1);
-            func_top();
-            func_mid();
+        BLOB_INT_A("jval", &jval, 1);
+        jval_squared = 1.0 * (jval) * (jval) / (NELEM / 2);
+        jval_cubed = 1.0 * (jval) * (jval) * (jval) / (NELEM * NELEM / 4);
+        BLOB_FLOAT_A("jval_squared", &jval_squared, 1);
+        BLOB_FLOAT_A("jval_cubed", &jval_cubed, 1);
+        BLOB_UNSIGNED_INT_A("abs_j", &abs_j, 1);
 
-            func_top();
-            func_top();
-        }
-        BLOB_FLUSH();
-        
-        for (i=0; i<NELEM; i++)
-        {
-            jval[i] = 0;
-        }
-
-        for (i=0; i<10; i++)
-        {
-            jval[(j + i * i) % NELEM] = 1;
-        }
-        j =  j + 1 % NELEM;
+        jval =  ((j + 1) % NELEM) - NELEM / 2;
+        j++;
         usleep(20000); // 20ms
-        printf("count: %d\n", count++);
         BLOB_FLUSH();
     }
     
-    BLOB_SOCKET_TERMINATE();
+    BLOB_TERMINATE();
     return 0;
 }

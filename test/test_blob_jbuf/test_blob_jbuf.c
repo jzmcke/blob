@@ -47,7 +47,7 @@ main(int argc, char **argv)
     jbuf_cfg.jbuf_len = JBUF_LEN;
     ret = blob_jbuf_init(&p_jbuf, &jbuf_cfg);
     assert(ret == BLOB_JBUF_OK);
-    
+
     for (seq_num=0; seq_num<N_BLOB_TREES; seq_num++)
     {
         printf("Writing %d %d %d\n", *((int*)aap_blob_trees[seq_num][0] + 3), *((int*)aap_blob_trees[seq_num][1] + 3), *((int*)aap_blob_trees[seq_num][2] + 3));
@@ -62,7 +62,7 @@ main(int argc, char **argv)
                 }                
             }
         }
-       
+
         frag_start_idx++;
         // Pull after every push
         ret = blob_jbuf_pull(p_jbuf, &p_out, &out_n);
@@ -75,6 +75,10 @@ main(int argc, char **argv)
     while (p_out != NULL)
     {
         ret = blob_jbuf_pull(p_jbuf, &p_out, &out_n);
+        if (NULL != p_out)
+        {
+            printf("Reading %d %d %d\n", *((int*)p_out), *((int*)p_out + 1), *((int*)p_out + 2));
+        }
     }
 
 
