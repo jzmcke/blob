@@ -1,5 +1,6 @@
 from cffi import FFI
 import os
+import platform
 
 import copy
 
@@ -18,7 +19,10 @@ class BlobFrag:
             int
             blob_frag_tx_next_packet(blob_frag_tx *p_blob_frag_tx, unsigned char **pp_data, size_t *p_n);
         """)
-        self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..\make\blob_jbuf_lib\build\bin\Release\blob_jbuf_lib.dll"))
+        if platform.system() == "Windows":
+            self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..", "bin", "blob_jbuf_lib.dll"))
+        elif platform.system() == "Linux":
+            self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..", "bin", "libblob_jbuf_lib.so"))
         
         self.frag = self.ffi.new("blob_frag_tx **")
         res = self.lib.blob_frag_tx_init(self.frag, frag_size)
@@ -58,7 +62,10 @@ class BlobJBUF:
         """)
 
         # Load the shared library
-        self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..\make\blob_jbuf_lib\build\bin\Release\blob_jbuf_lib.dll"))
+        if platform.system() == "Windows":
+            self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..", "bin", "blob_jbuf_lib.dll"))
+        elif platform.system() == "Linux":
+            self.lib = self.ffi.dlopen(os.path.join(os.path.dirname(__file__), r"..", "bin", "libblob_jbuf_lib.so"))
         
         self.jbuf = self.ffi.new("blob_jbuf **")
         self.cfg = self.ffi.new("blob_jbuf_cfg *")

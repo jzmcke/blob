@@ -20,9 +20,9 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
 # Set the output directory for the built library
 set_target_properties(blob_jbuf_lib PROPERTIES
-                      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+                      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
                       ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
 # Optional: Define an install target
 install(TARGETS blob_jbuf_lib
