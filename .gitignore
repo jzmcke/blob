@@ -1,1 +1,22 @@
+# C/C++ Artifacts
 *.o
+*.obj
+*.lib
+*.a
+*.dylib
+*.dll
+*.so
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# Build Directories
+build/
+out/
+
+# Python Artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

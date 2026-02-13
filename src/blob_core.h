@@ -1,6 +1,7 @@
 #ifndef BLOB_CORE_H
 #define BLOB_CORE_H
 #include <stdio.h>
+#include <stdint.h>
 
 #define BLOB_PROTOCOL_VERSION_FIRST (1)
 #define BLOB_MAX_VAR_NAME_LEN       (128)

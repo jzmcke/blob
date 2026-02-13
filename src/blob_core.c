@@ -225,13 +225,13 @@ blob_core_unsigned_int_a(blob_core *p_blob, const char *p_var_name, unsigned int
         }
 
         /* Allocate new, larger blob, copy old blob into it. */
-        p_new_blob = (unsigned char*)calloc(p_blob->base_blob_size + sizeof(u_int32_t)*n, 1);
+        p_new_blob = (unsigned char*)calloc(p_blob->base_blob_size + sizeof(uint32_t)*n, 1);
         memcpy(p_new_blob, p_blob->p_blob_data, p_blob->base_blob_size);
         p_blob->a_var_data_offsets[p_blob->n_vars_in_blob] = p_blob->base_blob_size;
         free(p_blob->p_blob_data);
         p_blob->p_blob_data = p_new_blob;
         p_blob->p_root_blob_data = p_new_blob;
-        p_blob->base_blob_size += n * sizeof(u_int32_t);
+        p_blob->base_blob_size += n * sizeof(uint32_t);
         p_blob->total_blob_size = p_blob->base_blob_size;
 
         strcpy(p_blob->aa_var_names[p_blob->n_vars_in_blob], p_var_name);
@@ -268,7 +268,7 @@ blob_core_unsigned_int_a(blob_core *p_blob, const char *p_var_name, unsigned int
     p_var_data = &p_blob->p_blob_data[p_blob->a_var_data_offsets[p_blob->var_idx]];
     for (int i=0; i<n; i++)
     {
-        *((u_int32_t*)&p_var_data[i*sizeof(u_int32_t)]) = p_var_val[i];
+        *((uint32_t*)&p_var_data[i*sizeof(uint32_t)]) = p_var_val[i];
     }
     p_blob->var_idx++;
     return BLOB_OK;
@@ -340,7 +340,7 @@ blob_core_set_from_data(blob_core *p_blob,
         }
         else if (p_blob->a_var_types[i] == BLOB_VAR_TYPE_UNSIGNED_INT)
         {
-            offset += (sizeof(u_int32_t) * p_blob->a_var_len[i]);
+            offset += (sizeof(uint32_t) * p_blob->a_var_len[i]);
         }
     }
     p_blob->base_blob_size = offset;
