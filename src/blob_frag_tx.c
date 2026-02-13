@@ -92,3 +92,14 @@ blob_frag_tx_next_packet(blob_frag_tx *p_blob_frag_tx, unsigned char **pp_data, 
 
     return 0;
 }
+
+int
+blob_frag_tx_close(blob_frag_tx **pp_blob_frag_tx)
+{
+    if (pp_blob_frag_tx == NULL || *pp_blob_frag_tx == NULL) return 0;
+    blob_frag_tx *p_tx = *pp_blob_frag_tx;
+    if (p_tx->p_out_buffer) free(p_tx->p_out_buffer);
+    free(p_tx);
+    *pp_blob_frag_tx = NULL;
+    return 0;
+}

@@ -1,0 +1,14 @@
+LIBRARY blob_core
+EXPORTS
+    blob_init
+    blob_close
+    blob_start
+    blob_int_a
+    blob_float_a
+    blob_flush
+    blob_retrieve_start
+    blob_retrieve_int_a
+    blob_retrieve_float_a
+    blob_udp_init
+    blob_udp_poll
+    blob_udp_close

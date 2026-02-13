@@ -7,13 +7,17 @@
 int
 blob_node_close(blob_node **pp_blob_node)
 {
+    if (pp_blob_node == NULL || *pp_blob_node == NULL) return BLOB_OK;
     blob_node *p_blob_node = *pp_blob_node;
+    
     for (int i=0; i<p_blob_node->n_children; i++)
     {
-        /* Must free child nodes before attempting to free this node */
-        assert(NULL == p_blob_node->ap_child_nodes[i]);
-        return BLOB_ERR;
+        if (p_blob_node->ap_child_nodes[i])
+        {
+             blob_node_close(&p_blob_node->ap_child_nodes[i]);
+        }
     }
+    p_blob_node->n_children = 0;
 
     blob_core_close(&p_blob_node->p_blob);
     free(*pp_blob_node);

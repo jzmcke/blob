@@ -4,8 +4,7 @@
 #include "../include/blob.h"
 #include "blob_node.h"
 
-blob_comm_cfg g_blob_ccfg;
-blob *p_g_blob;
+
 
 struct blob_s
 {
@@ -14,21 +13,37 @@ struct blob_s
 };
 
 int
-blob_init(blob_comm_cfg *p_blob_comm_cfg)
+blob_init(blob **pp_blob, blob_comm_cfg *p_blob_comm_cfg)
 {
-    p_g_blob = (blob*)calloc(sizeof(blob), 1);
+    blob *p_blob = (blob*)calloc(sizeof(blob), 1);
+    if (!p_blob) return BLOB_ERR;
+
     {
         blob_nts_cfg nts_cfg;
         nts_cfg.p_send_cb = p_blob_comm_cfg->p_send_cb;
         nts_cfg.p_send_context = p_blob_comm_cfg->p_send_context;
-        blob_node_tree_send_init(&p_g_blob->p_nts, &nts_cfg);
+        blob_node_tree_send_init(&p_blob->p_nts, &nts_cfg);
     }
     {
         blob_ntr_cfg ntr_cfg;
         ntr_cfg.p_rcv_cb = p_blob_comm_cfg->p_rcv_cb;
         ntr_cfg.p_rcv_context = p_blob_comm_cfg->p_rcv_context;
-        blob_node_tree_retrieve_init(&p_g_blob->p_ntr, &ntr_cfg);
+        blob_node_tree_retrieve_init(&p_blob->p_ntr, &ntr_cfg);
     }
+
+    *pp_blob = p_blob;
+    return BLOB_OK;
+}
+
+int
+blob_close(blob **pp_blob)
+{
+    if (pp_blob == NULL || *pp_blob == NULL) return BLOB_OK;
+    blob *p_blob = *pp_blob;
+    blob_node_tree_send_close(&p_blob->p_nts);
+    blob_node_tree_retrieve_close(&p_blob->p_ntr);
+    free(p_blob);
+    *pp_blob = NULL;
     return BLOB_OK;
 }
 

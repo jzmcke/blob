@@ -43,6 +43,23 @@ blob_node_tree_send_init(blob_node_tree_send **pp_nts, blob_nts_cfg *p_blob_nts_
 }
 
 int
+blob_node_tree_send_close(blob_node_tree_send **pp_nts)
+{
+    if (pp_nts == NULL || *pp_nts == NULL) return BLOB_OK;
+    blob_node_tree_send *p_nts = *pp_nts;
+    if (p_nts->p_cur_node)
+    {
+        // Go to root and close
+        blob_node *p_node = p_nts->p_cur_node;
+        while (p_node->p_parent_node) p_node = p_node->p_parent_node;
+        blob_node_close(&p_node);
+    }
+    free(p_nts);
+    *pp_nts = NULL;
+    return BLOB_OK;
+}
+
+int
 blob_node_tree_retrieve_init(blob_node_tree_retrieve **pp_nts, blob_ntr_cfg *p_blob_ntr_cfg)
 {
     blob_node_tree_retrieve* p_node_tree;
@@ -57,6 +74,21 @@ blob_node_tree_retrieve_init(blob_node_tree_retrieve **pp_nts, blob_ntr_cfg *p_b
     p_node_tree->b_new_data = 0;
 
     *pp_nts = p_node_tree;
+    return BLOB_OK;
+}
+
+int
+blob_node_tree_retrieve_close(blob_node_tree_retrieve **pp_ntr)
+{
+    if (pp_ntr == NULL || *pp_ntr == NULL) return BLOB_OK;
+    blob_node_tree_retrieve *p_ntr = *pp_ntr;
+    if (p_ntr->p_root_node)
+    {
+        blob_node_close(&p_ntr->p_root_node);
+    }
+    // Note: p_ntr->p_data is NOT owned by this struct, it's owned by the comm layer callback
+    free(p_ntr);
+    *pp_ntr = NULL;
     return BLOB_OK;
 }
 
@@ -155,77 +187,65 @@ blob_node_tree_send_flush(blob_node_tree_send *p_nts)
 int
 blob_node_tree_retrieve_start(blob_node_tree_retrieve *p_ntr, const char *p_name)
 {
-    int child;
-    unsigned char *p_node_tree = NULL;
-    size_t rcv_node_tree_bytes = 0;
-    if (  (NULL == p_ntr->p_root_node) || (p_ntr->p_cur_node == p_ntr->p_root_node))
+    /* 1. If we are currently in a node, check if the requested node is one of its children */
+    if (NULL != p_ntr->p_cur_node)
     {
-        /* Root node */
-        /* Receive data via the provided send callback */
+        for (int i = 0; i < p_ntr->p_cur_node->n_children; i++)
+        {
+            if (0 == strcmp(p_name, p_ntr->p_cur_node->ap_child_nodes[i]->p_name))
+            {
+                p_ntr->p_cur_node = p_ntr->p_cur_node->ap_child_nodes[i];
+                return 0;
+            }
+        }
+    }
+
+    /* 2. If it's not a child, check if it's a request for the root node (first time or reload) */
+    if ( (NULL == p_ntr->p_root_node) || (0 == strcmp(p_name, p_ntr->p_root_node->p_name)) )
+    {
+        unsigned char *p_node_tree_data = NULL;
+        size_t rcv_node_tree_bytes = 0;
+        size_t total_size = 0;
+
+        /* Flush/Clear existing root if we are reloading */
+        if (NULL != p_ntr->p_root_node)
+        {
+            blob_node_close(&p_ntr->p_root_node);
+        }
+
+        /* Receive new data via the provided receive callback (e.g. jbuf pull) */
         p_ntr->p_rcv_cb(p_ntr->p_rcv_context, &p_ntr->p_data, &p_ntr->n_data);
 
-        p_node_tree = p_ntr->p_data + DOWNSTREAM_SERVER_HEADER_BYTES;
+        if (NULL == p_ntr->p_data)
+        {
+            return BLOB_ERR;
+        }
+
+        p_node_tree_data = p_ntr->p_data + DOWNSTREAM_SERVER_HEADER_BYTES;
         rcv_node_tree_bytes = p_ntr->n_data - DOWNSTREAM_SERVER_HEADER_BYTES;
 
+        /* Disassemble the data and create the node-tree */
+        blob_node_disassemble_data(&p_ntr->p_root_node, p_node_tree_data, &total_size);
 
-        if (NULL != p_ntr->p_data)
+        if (total_size != rcv_node_tree_bytes)
         {
-            p_ntr->b_new_data = 1;
+            printf("Error decoding packet; size mismatch. Decode size %u, data size %u.\n", (unsigned int)total_size, (unsigned int)rcv_node_tree_bytes);
         }
+
+        p_ntr->p_cur_node = p_ntr->p_root_node;
+        p_ntr->b_new_data = 1;
+
+        /* Verify the loaded root matches the requested name */
+        if (0 != strcmp(p_name, p_ntr->p_root_node->p_name))
+        {
+            printf("Error, requested root node '%s' but received '%s'\n", p_name, p_ntr->p_root_node->p_name);
+            return BLOB_ERR;
+        }
+        return 0;
     }
-    
-    /* Pretty sure I don't need to maintain a variable called p_root_node here */
-    if (NULL != p_ntr->p_data)
-    {
-        if (  (NULL == p_ntr->p_root_node))
-        {
-            size_t total_size;
-            /* Disassemble the data and create the node-tree */
-            blob_node_disassemble_data(&p_ntr->p_root_node, p_node_tree, &total_size);
 
-            if (total_size != rcv_node_tree_bytes)
-            {
-                printf("Error decoding packet; size mismatch. Decode size %u, data size %u.\n", (unsigned int)total_size, (unsigned int)p_ntr->n_data);
-            }
-            /* Could both be NULL, so update p_cur_node to the root node since disassemble will do the allocate */
-            p_ntr->p_cur_node = p_ntr->p_root_node;
-        }
-        else if (  (p_ntr->p_cur_node == p_ntr->p_root_node)
-            &&(0 == strcmp(p_name, p_ntr->p_root_node->p_name))
-            )
-        {
-            size_t total_size;
-            
-            /* Disassemble the data and create the node-tree */
-            blob_node_disassemble_data(&p_ntr->p_root_node, p_node_tree, &total_size);
-            
-            if (total_size != rcv_node_tree_bytes)
-            {
-                printf("Error decoding packet; size mismatch. Decode size %u, data size %u.\n", (unsigned int)total_size, (unsigned int)rcv_node_tree_bytes);
-            }
-
-            /* Could both be NULL, so update p_cur_node to the root node since disassemble will do the allocate */
-            p_ntr->p_cur_node = p_ntr->p_root_node;
-        }
-        else
-        {
-            int next = -1;
-            for (child=0; child<p_ntr->p_root_node->n_children; child++)
-            {
-                if (0 == strcmp(p_name, p_ntr->p_cur_node->p_name))
-                {
-                    next = child;   
-                }
-            }
-            if (next == -1)
-            {
-                printf("Error, invalid node name\n");
-                return -1;
-            }
-            p_ntr->p_cur_node = p_ntr->p_cur_node->ap_child_nodes[next];
-        }
-    }
-    return 0;
+    printf("Error, invalid node name '%s'\n", p_name);
+    return BLOB_ERR;
 }
 
 int

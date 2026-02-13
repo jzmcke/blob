@@ -53,9 +53,17 @@ packet_deep_empty(packet *p_packet)
 int
 packet_shallow_empty(packet *p_packet)
 {
+    if (p_packet->p_unfragmented_data != NULL)
+    {
+        free(p_packet->p_unfragmented_data);
+        p_packet->p_unfragmented_data = NULL;
+    }
+    
     for (int i=0; i<p_packet->total_fragments; i++)
     {
         p_packet->p_fragments[i].b_occupied = 0;
+        p_packet->p_fragments[i].p_fragment_data = NULL;
+        p_packet->p_fragments[i].size = 0;
     }
     p_packet->received_fragments = 0;
     p_packet->seq_num = -1;

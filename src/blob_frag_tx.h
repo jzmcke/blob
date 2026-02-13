@@ -19,3 +19,9 @@ __declspec(dllexport)
 #endif
 int
 blob_frag_tx_next_packet(blob_frag_tx *p_blob_frag_tx, unsigned char **pp_data, size_t *p_n);
+
+#ifdef BLOB_WINDOWS_DLL
+__declspec(dllexport)
+#endif
+int
+blob_frag_tx_close(blob_frag_tx **pp_blob_frag_tx);

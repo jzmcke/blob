@@ -19,6 +19,7 @@ struct blob_core_s
     int             var_idx; /* the variable the blob is expecting to be written next */
 
     size_t          serialized_data_size;
+    int             b_owns_data;
 };
 
 int
@@ -48,7 +49,7 @@ blob_core_close(blob_core **pp_blob)
     blob_core *p_blob = *pp_blob;
     if (p_blob != NULL)
     {
-        if (NULL != p_blob->p_root_blob_data)
+        if (p_blob->b_owns_data && NULL != p_blob->p_root_blob_data)
         {
             free(p_blob->p_root_blob_data);
             p_blob->p_root_blob_data = NULL;
@@ -85,6 +86,7 @@ blob_core_float_a(blob_core *p_blob, const char *p_var_name, float *p_var_val, i
         free(p_blob->p_root_blob_data); /* Apparently it's OK to free a NULL pointer.. so the first variable made is all g :) cool */
 
         p_blob->p_root_blob_data = p_new_blob;
+        p_blob->b_owns_data = 1;
         p_blob->p_blob_data = p_new_blob;
         p_blob->a_var_data_offsets[p_blob->n_vars_in_blob] = p_blob->base_blob_size;
         
@@ -159,6 +161,7 @@ blob_core_int_a(blob_core *p_blob, const char *p_var_name, int *p_var_val, int n
         free(p_blob->p_blob_data);
         p_blob->p_blob_data = p_new_blob;
         p_blob->p_root_blob_data = p_new_blob;
+        p_blob->b_owns_data = 1;
         p_blob->base_blob_size += n * sizeof(int32_t);
         p_blob->total_blob_size = p_blob->base_blob_size;
 
@@ -231,6 +234,7 @@ blob_core_unsigned_int_a(blob_core *p_blob, const char *p_var_name, unsigned int
         free(p_blob->p_blob_data);
         p_blob->p_blob_data = p_new_blob;
         p_blob->p_root_blob_data = p_new_blob;
+        p_blob->b_owns_data = 1;
         p_blob->base_blob_size += n * sizeof(uint32_t);
         p_blob->total_blob_size = p_blob->base_blob_size;
 

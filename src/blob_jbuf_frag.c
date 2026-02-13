@@ -4,6 +4,12 @@
 #include "blob_jbuf_frag.h"
 #include "packet.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
 
 struct blob_jbuf_s
 {
@@ -17,6 +23,11 @@ struct blob_jbuf_s
     int          b_exit_fullness;
     packet_cfg   packet_cfg;
     int          n_fragments;
+#ifdef _WIN32
+    CRITICAL_SECTION mutex;
+#else
+    pthread_mutex_t mutex;
+#endif
 };
 
 int
@@ -48,11 +59,19 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
     }
     p_jbuf->push_idx = 0;
     p_jbuf->pull_idx = p_jbuf->jbuf_len - 1;
+
+#ifdef _WIN32
+    InitializeCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_init(&p_jbuf->mutex, NULL);
+#endif
+
     printf("jbuf_len: %d\n", p_jbuf->jbuf_len);
     printf("jbuf_latency: %d\n", p_jbuf->latency);
     *pp_jbuf = p_jbuf;
     return 0;
 }
+
 
 /* Push an element onto the buffer. Push index will never be incremented over the pull.
    Anything that makes it into the queue stays in the queue until it is pulled by the caller
@@ -62,6 +81,13 @@ int
 blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
 {
     int ret = BLOB_JBUF_OK;
+
+#ifdef _WIN32
+    EnterCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_lock(&p_jbuf->mutex);
+#endif
+
     int *p_new_data_ints = (int *)p_new_data;
 
     // Could add these as input arguments to the function itself.
@@ -106,7 +132,8 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     if (p_packet->seq_num > seq_num)
     {
         printf("Dropped packet at idx %d!\n", p_jbuf->push_idx);
-        return BLOB_JBUF_DROPPED_PACKET;
+        ret = BLOB_JBUF_DROPPED_PACKET;
+        goto unlock_and_return;
     }
 
     packet_set_seq_num(p_packet, seq_num);
@@ -116,7 +143,6 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
         && (!p_jbuf->b_exit_fullness))
     {
         packet_add_fragment_data(p_packet, p_new_data, n);
-        
     }
     else
     {
@@ -143,6 +169,13 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
         ret = ret == BLOB_JBUF_OK ? BLOB_JBUF_FRAGMENT_RECEIVED : ret;
     }
     
+unlock_and_return:
+#ifdef _WIN32
+    LeaveCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_unlock(&p_jbuf->mutex);
+#endif
+
     return ret;
 }
 
@@ -162,6 +195,12 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     Assumes that receiver has already pulled the latest packet and used it. */
     *pp_new_data = NULL;
     *p_n = 0;
+
+#ifdef _WIN32
+    EnterCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_lock(&p_jbuf->mutex);
+#endif
 
     if (!p_jbuf->b_exit_emptiness)
     {
@@ -202,6 +241,12 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
         }
     }
     
+#ifdef _WIN32
+    LeaveCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_unlock(&p_jbuf->mutex);
+#endif
+
     return ret;
 }
 
@@ -209,15 +254,22 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
 int
 blob_jbuf_close(blob_jbuf **pp_jbuf)
 {
-    for (int i=0; i<(*pp_jbuf)->jbuf_len; i++)
+    if (pp_jbuf == NULL || *pp_jbuf == NULL) return 0;
+    blob_jbuf *p_jbuf = *pp_jbuf;
+
+    for (int i=0; i<p_jbuf->jbuf_len; i++)
     {
-        if (NULL != &((*pp_jbuf)->p_packets[i]))
-        {
-            packet_close(&((*pp_jbuf)->p_packets[i]));
-        }
+        packet_deep_empty(&p_jbuf->p_packets[i]);
     }
-    free((*pp_jbuf)->p_packets);
-    free(*pp_jbuf);
+
+#ifdef _WIN32
+    DeleteCriticalSection(&p_jbuf->mutex);
+#else
+    pthread_mutex_destroy(&p_jbuf->mutex, NULL);
+#endif
+
+    free(p_jbuf->p_packets);
+    free(p_jbuf);
+    *pp_jbuf = NULL;
     return BLOB_JBUF_OK;
 }
-#

@@ -21,7 +21,13 @@ int
 blob_node_tree_send_init(blob_node_tree_send **pp_nts, blob_nts_cfg *p_blob_nts_cfg);
 
 int
+blob_node_tree_send_close(blob_node_tree_send **pp_nts);
+
+int
 blob_node_tree_retrieve_init(blob_node_tree_retrieve **pp_nts, blob_ntr_cfg *p_blob_ntr_cfg);
+
+int
+blob_node_tree_retrieve_close(blob_node_tree_retrieve **pp_nts);
 
 int
 blob_node_tree_send_start(blob_node_tree_send *p_nts, const char *node_name);
