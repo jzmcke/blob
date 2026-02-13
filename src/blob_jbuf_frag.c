@@ -23,7 +23,9 @@ struct blob_jbuf_s
     int          b_exit_fullness;
     packet_cfg   packet_cfg;
     int          n_fragments;
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // WASM is single-threaded, no mutex needed
+#elif defined(_WIN32)
     CRITICAL_SECTION mutex;
 #else
     pthread_mutex_t mutex;
@@ -60,7 +62,9 @@ blob_jbuf_init(blob_jbuf **pp_jbuf, blob_jbuf_cfg *p_jbuf_cfg)
     p_jbuf->push_idx = 0;
     p_jbuf->pull_idx = p_jbuf->jbuf_len - 1;
 
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     InitializeCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_init(&p_jbuf->mutex, NULL);
@@ -82,7 +86,9 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
 {
     int ret = BLOB_JBUF_OK;
 
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     EnterCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_lock(&p_jbuf->mutex);
@@ -170,7 +176,9 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
     }
     
 unlock_and_return:
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     LeaveCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_unlock(&p_jbuf->mutex);
@@ -196,7 +204,9 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     *pp_new_data = NULL;
     *p_n = 0;
 
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     EnterCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_lock(&p_jbuf->mutex);
@@ -241,7 +251,9 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
         }
     }
     
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     LeaveCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_unlock(&p_jbuf->mutex);
@@ -262,10 +274,12 @@ blob_jbuf_close(blob_jbuf **pp_jbuf)
         packet_deep_empty(&p_jbuf->p_packets[i]);
     }
 
-#ifdef _WIN32
+#ifdef EMSCRIPTEN
+    // No mutex needed for single-threaded WASM
+#elif defined(_WIN32)
     DeleteCriticalSection(&p_jbuf->mutex);
 #else
-    pthread_mutex_destroy(&p_jbuf->mutex, NULL);
+    pthread_mutex_destroy(&p_jbuf->mutex);
 #endif
 
     free(p_jbuf->p_packets);
