@@ -144,6 +144,63 @@ data = writer.flush()
 udp_tx.send(data)
 ```
 
+### C (Consuming Data)
+
+```c
+#include "blob.h"
+
+// Callback to receive data from transport (e.g., UDP/WS)
+int my_rcv_callback(void *context, unsigned char **pp_data, size_t *p_size) {
+    // 1. Retrieve data from your transport layer
+    *pp_data = my_transport_buffer;
+    *p_size = my_transport_bytes;
+    return 0;
+}
+
+int main() {
+    // 1. Initialize
+    blob_comm_cfg cfg = { .p_rcv_cb = my_rcv_callback, .p_rcv_context = ctx };
+    blob *p_blob = NULL;
+    blob_init(&p_blob, &cfg);
+    
+    // 2. Decode & Process
+    if (blob_retrieve_start(p_blob, "sensor_data") == BLOB_OK) {
+        float *temps;
+        int n_temps;
+        
+        // 3. Extract Variables
+        blob_retrieve_float_a(p_blob, "temp", &temps, &n_temps, 0);
+        
+        for(int i=0; i<n_temps; i++) {
+            printf("Temp[%d]: %f\n", i, temps[i]);
+        }
+    }
+    
+    blob_close(&p_blob);
+    return 0;
+}
+```
+
+### Python (Consuming Data)
+
+```python
+from blob.blob_read import blob_read_node_tree, blob_minimal, blob_flatten
+
+# 1. Receive binary data (e.g., from UDP socket)
+data, addr = sock.recvfrom(4096)
+
+# 2. Parse the binary blob
+# blob_read.py provides a pure Python implementation - no C compilation needed!
+node_tree, remains = blob_read_node_tree(data)
+
+# 3. Access Data
+# You can navigate the tree directly or flatten it for easier access
+flat_data = blob_flatten(blob_minimal(node_tree))
+
+print(f"Temp: {flat_data['sensor_data.temp']}")
+print(f"Status: {flat_data['sensor_data.status']}")
+```
+
 ### JavaScript / WASM (Consuming Data)
 
 ```javascript
