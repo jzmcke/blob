@@ -1,21 +1,18 @@
 
-function readInt32(buffer)
-{
+function readInt32(buffer) {
     dv = new DataView(buffer);
     val = dv.getInt32(0, true);
     buffer = buffer.slice(4);
     return [buffer, val];
 }
 
-function readString(buffer)
-{
-    val = String.fromCharCode.apply(null, new Uint8Array(buffer.slice(0,128))).replace(/\0.*$/g,'');
+function readString(buffer) {
+    val = String.fromCharCode.apply(null, new Uint8Array(buffer.slice(0, 128))).replace(/\0.*$/g, '');
     buffer = buffer.slice(128);
     return [buffer, val];
 }
 
-function writeString(buffer, string, strlen)
-{
+function writeString(buffer, string, strlen) {
     var out_buf = new ArrayBuffer(buffer.byteLength + strlen);
 
     /* First, copy the existing buffer into the new array buffer */
@@ -24,15 +21,13 @@ function writeString(buffer, string, strlen)
     /* Create a view into the buffer with offset of the original buffer length */
     var strview = new Int8Array(out_buf, buffer.byteLength, string.length);
     var i;
-    for (i=0; i<string.length; i++)
-    {
+    for (i = 0; i < string.length; i++) {
         strview[i] = string.charCodeAt(i);
     }
     return out_buf;
 }
 
-function writeInt32Array(buffer, arr)
-{
+function writeInt32Array(buffer, arr) {
     var out_buf = new ArrayBuffer(buffer.byteLength + arr.byteLength);
 
     /* First, copy the existing buffer into the new array buffer */
@@ -41,8 +36,7 @@ function writeInt32Array(buffer, arr)
     return out_buf;
 }
 
-function writeFloat32Array(buffer, arr)
-{
+function writeFloat32Array(buffer, arr) {
     var out_buf = new ArrayBuffer(buffer.byteLength + arr.byteLength);
 
     /* First, copy the existing buffer into the new array buffer */
@@ -51,8 +45,7 @@ function writeFloat32Array(buffer, arr)
     return out_buf;
 }
 
-function writeUInt32Array(buffer, arr)
-{
+function writeUInt32Array(buffer, arr) {
     var out_buf = new ArrayBuffer(buffer.byteLength + arr.byteLength);
 
     /* First, copy the existing buffer into the new array buffer */
@@ -61,8 +54,7 @@ function writeUInt32Array(buffer, arr)
     return out_buf;
 }
 
-function blobEncode(in_data, name, buffer)
-{   
+function blobEncode(in_data, name, buffer) {
     buffer = writeString(buffer, name, 128);
 
     /* This may not be the correct notation */
@@ -75,16 +67,13 @@ function blobEncode(in_data, name, buffer)
     var variables = [];
     var variable_names = [];
     var child_idx, entry_idx, var_idx;
-    for (entry_idx=0; entry_idx<n_entries; entry_idx++)
-    {
-        if (in_data[keys[entry_idx]].constructor === Int32Array || in_data[keys[entry_idx]].constructor === Float32Array || in_data[keys[entry_idx]].constructor === Uint32Array)
-        {
+    for (entry_idx = 0; entry_idx < n_entries; entry_idx++) {
+        if (in_data[keys[entry_idx]].constructor === Int32Array || in_data[keys[entry_idx]].constructor === Float32Array || in_data[keys[entry_idx]].constructor === Uint32Array) {
             variables.push(in_data[keys[entry_idx]]);
             variable_names.push(keys[entry_idx]);
             n_vals++;
         }
-        else
-        {
+        else {
             n_children++;
             children.push(in_data[keys[entry_idx]]);
             children_names.push(keys[entry_idx]);
@@ -94,75 +83,60 @@ function blobEncode(in_data, name, buffer)
     buffer = writeInt32Array(buffer, new Int32Array([n_children]));
 
     /* b_has_blob */
-    if (n_vals > 0)
-    {
+    if (n_vals > 0) {
         buffer = writeInt32Array(buffer, new Int32Array([1]));
     }
-    else
-    {
+    else {
         buffer = writeInt32Array(buffer, new Int32Array([0]));
     }
 
-    if (n_vals > 0)
-    {
+    if (n_vals > 0) {
         /* Only can write nreps = 0 for now */
         buffer = writeInt32Array(buffer, new Int32Array([0]));
         /* n variables */
         buffer = writeInt32Array(buffer, new Int32Array([n_vals]));
-        for (var_idx=0; var_idx<n_vals; var_idx++)
-        {
+        for (var_idx = 0; var_idx < n_vals; var_idx++) {
             buffer = writeString(buffer, variable_names[var_idx], 128);
         }
         /* type */
-        for (var_idx=0; var_idx<n_vals; var_idx++)
-        {
+        for (var_idx = 0; var_idx < n_vals; var_idx++) {
 
-            if (variables[var_idx].constructor === Float32Array)
-            {
+            if (variables[var_idx].constructor === Float32Array) {
                 buffer = writeInt32Array(buffer, new Int32Array([1]));
             }
-            if (variables[var_idx].constructor === Int32Array)
-            {
+            if (variables[var_idx].constructor === Int32Array) {
                 buffer = writeInt32Array(buffer, new Int32Array([0]));
             }
-            if (variables[var_idx].constructor === Uint32Array)
-            {
+            if (variables[var_idx].constructor === Uint32Array) {
                 buffer = writeInt32Array(buffer, new Int32Array([2]));
             }
         }
         /* lens */
-        for (var_idx=0; var_idx<n_vals; var_idx++)
-        {
+        for (var_idx = 0; var_idx < n_vals; var_idx++) {
             buffer = writeInt32Array(buffer, new Int32Array([variables[var_idx].length]));
         }
-        for (var_idx=0; var_idx<n_vals; var_idx++)
-        {
+        for (var_idx = 0; var_idx < n_vals; var_idx++) {
             var i;
-            if (variables[var_idx].constructor === Float32Array)
-            {
-                
+            if (variables[var_idx].constructor === Float32Array) {
+
                 buffer = writeFloat32Array(buffer, variables[var_idx]);
             }
-            if (variables[var_idx].constructor === Int32Array)
-            {
+            if (variables[var_idx].constructor === Int32Array) {
                 buffer = writeInt32Array(buffer, variables[var_idx]);
             }
-            if (variables[var_idx].constructor === Uint32Array)
-            {
+            if (variables[var_idx].constructor === Uint32Array) {
                 buffer = writeUInt32Array(buffer, variables[var_idx]);
             }
         }
     }
 
-    for (child_idx=0; child_idx<n_children; child_idx++)
-    {
+    for (child_idx = 0; child_idx < n_children; child_idx++) {
         buffer = blobEncode(children[child_idx], children_names[child_idx], buffer);
     }
     return buffer;
 }
 
-function blobDecode(buffer)
-{
+function blobDecode(buffer) {
     var out = {};
     var nodename;
     var n_children;
@@ -185,39 +159,31 @@ function blobDecode(buffer)
         varnames = []
         types = []
         lens = []
-        for (i=0; i<n_variables; i++)
-        {
+        for (i = 0; i < n_variables; i++) {
             [buffer, varname] = readString(buffer);
             out[varname] = []
             varnames.push(varname);
         }
-        for (i=0; i<n_variables; i++)
-        {
+        for (i = 0; i < n_variables; i++) {
             [buffer, type] = readInt32(buffer);
             types.push(type);
         }
-        for (i=0; i<n_variables; i++)
-        {
+        for (i = 0; i < n_variables; i++) {
             [buffer, len] = readInt32(buffer);
             lens.push(len);
         }
-        
-        for (rep=0; rep<n_repetitions+1; rep++)
-        {
-            for (i=0; i<n_variables; i++)
-            {
-                if (types[i] == 0)
-                {
+
+        for (rep = 0; rep < n_repetitions + 1; rep++) {
+            for (i = 0; i < n_variables; i++) {
+                if (types[i] == 0) {
                     /* int */
                     val = new Int32Array(buffer.slice(0, lens[i] * 4));
                     buffer = buffer.slice(lens[i] * 4);
-                } else if (types[i] == 1)
-                {
+                } else if (types[i] == 1) {
                     /* float */
                     val = new Float32Array(buffer.slice(0, lens[i] * 4));
                     buffer = buffer.slice(lens[i] * 4);
-                } else if (types[i] == 2)
-                {
+                } else if (types[i] == 2) {
                     /* unsigned int */
                     val = new Uint32Array(buffer.slice(0, lens[i] * 4));
                     buffer = buffer.slice(lens[i] * 4);
@@ -227,11 +193,24 @@ function blobDecode(buffer)
             }
         }
     }
-    for (i=0; i<n_children; i++)
-    {
+    for (i = 0; i < n_children; i++) {
         [buffer, childout, childname] = blobDecode(buffer);
         out[childname] = childout;
     }
-    
+
     return [buffer, out, nodename];
+}
+
+// Export for Node.js (CommonJS)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        blobDecode,
+        blobEncode,
+        readInt32,
+        readString,
+        writeString,
+        writeInt32Array,
+        writeFloat32Array,
+        writeUInt32Array
+    };
 }

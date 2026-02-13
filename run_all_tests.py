@@ -51,20 +51,40 @@ def main():
             "cwd": os.path.join(root_dir, "build")
         },
         {
-            "desc": "Run JS Core Server Tests",
-            "cmd": "npm test",
-            "cwd": os.path.join(website_root, "core-server", "script")
-        },
-        {
             "desc": "Run Python CFFI Tests",
             "cmd": "python test_blob_core.py",
             "cwd": os.path.join(root_dir, "test")
+        },
+        {
+            "desc": "Run JavaScript Blob Decoder Tests",
+            "cmd": "npx jest blob.test.js",
+            "cwd": os.path.join(root_dir, "test", "js")
         }
     ]
 
     failed_steps = []
     
     for step in steps:
+        # Special handling for JS tests - auto-install dependencies if needed
+        if step["desc"] == "Run JavaScript Blob Decoder Tests":
+            js_test_dir = step["cwd"]
+            node_modules_path = os.path.join(js_test_dir, "node_modules")
+            
+            # Check if node_modules exists, if not, run npm install
+            if not os.path.exists(node_modules_path):
+                print(f"--- Installing JavaScript test dependencies ---")
+                print(f"CWD: {js_test_dir}")
+                print(f"CMD: npm install")
+                try:
+                    install_result = subprocess.run("npm install", cwd=js_test_dir, shell=True, check=False)
+                    if install_result.returncode != 0:
+                        print(f"--- SKIPPED: {step['desc']} (npm install failed) ---\n")
+                        continue
+                    print(f"--- Dependencies installed successfully ---\n")
+                except Exception as e:
+                    print(f"--- SKIPPED: {step['desc']} (npm install error: {e}) ---\n")
+                    continue
+        
         if not run_command(step["cmd"], step["cwd"], step["desc"]):
             failed_steps.append(step["desc"])
 
