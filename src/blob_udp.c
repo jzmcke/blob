@@ -216,7 +216,7 @@ static int _blob_udp_rcv_cb(void *context, unsigned char **data, size_t *size) {
     
     int res = blob_jbuf_pull(p_ctx->p_rx_jbuf, &p_out, &out_n);
     
-    if (p_out) {
+    if (res == BLOB_JBUF_OK && p_out) {
         // Compatibility: blob_node_tree_retrieve_start expects 128 bytes of padding
         size_t padding = 128;
         unsigned char *p_padded = (unsigned char*)malloc(out_n + padding);

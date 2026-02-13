@@ -43,3 +43,21 @@ add_executable(blob_triangle_test ${TRIANGLE_SOURCE_FILES})
 target_compile_definitions(blob_triangle_test PRIVATE BLOB_FILE=1 _CRT_SECURE_NO_WARNINGS)
 target_link_libraries(blob_triangle_test ws2_32)
 set_target_properties(blob_triangle_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
+# Loopback Test Executable
+set(LOOPBACK_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/blob_core.c
+    ${CMAKE_SOURCE_DIR}/src/blob_node.c
+    ${CMAKE_SOURCE_DIR}/src/blob_node_tree.c
+    ${CMAKE_SOURCE_DIR}/src/blob.c
+    ${CMAKE_SOURCE_DIR}/src/blob_udp.c
+    ${CMAKE_SOURCE_DIR}/src/blob_frag_tx.c
+    ${CMAKE_SOURCE_DIR}/src/blob_jbuf_frag.c
+    ${CMAKE_SOURCE_DIR}/src/packet.c
+    ${CMAKE_SOURCE_DIR}/src/blob_ws_win.c
+    ${CMAKE_SOURCE_DIR}/test/blob_loopback_test.c
+)
+add_executable(blob_loopback_test ${LOOPBACK_SOURCE_FILES})
+target_compile_definitions(blob_loopback_test PRIVATE BLOB_FILE=1 _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(blob_loopback_test ws2_32)
+set_target_properties(blob_loopback_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)

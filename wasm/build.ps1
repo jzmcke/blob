@@ -22,7 +22,7 @@ $INCLUDES = "-I../include -I../src"
 $EXPORTS = "['_wasm_blob_init','_wasm_blob_process_packet','_wasm_blob_pull_packet','_wasm_blob_get_ready_count','_wasm_blob_cleanup','_malloc','_free']"
 
 # Exported runtime methods
-$RUNTIME_METHODS = "['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8']"
+$RUNTIME_METHODS = "['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8','getValue','setValue','HEAPU8']"
 
 # Compiler flags
 $CFLAGS = "-O3 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -DEMSCRIPTEN"

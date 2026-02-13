@@ -9,4 +9,5 @@ add_subdirectory(make/blob_jbuf_lib)
 add_subdirectory(make/unit_test)
 add_subdirectory(make/network_test)
 add_subdirectory(make/blob_core_lib)
+add_subdirectory(make/udp_sender)
 # Add more as needed

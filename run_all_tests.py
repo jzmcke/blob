@@ -46,6 +46,11 @@ def main():
             "cwd": os.path.join(root_dir, "build")
         },
         {
+            "desc": "Run Loopback Integration Test (Requires core-server)",
+            "cmd": r"..\bin\Release\blob_loopback_test.exe",
+            "cwd": os.path.join(root_dir, "build")
+        },
+        {
             "desc": "Run C Triangle wave test (Smoke)",
             "cmd": r"..\bin\Release\blob_triangle_test.exe 1000",
             "cwd": os.path.join(root_dir, "build")

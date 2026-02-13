@@ -106,12 +106,17 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
 
     // Push the new fragment into the buffer queue
     p_jbuf->push_idx = seq_num % p_jbuf->jbuf_len;
+    printf("PUSH: Seq %d -> Idx %d. Fullness %d. ExitEmpty %d\n", seq_num, p_jbuf->push_idx, p_jbuf->buffer_fullness, p_jbuf->b_exit_emptiness);
 
     p_packet = &p_jbuf->p_packets[p_jbuf->push_idx];
 
     // This line need to be here, since the number of fragments is not known until the first fragment is received.
     if (p_packet->total_fragments != total_fragments)
     {
+        if (packet_is_full(p_packet))
+        {
+            p_jbuf->buffer_fullness--;
+        }
         p_jbuf->n_fragments = total_fragments > p_jbuf->n_fragments ? total_fragments : p_jbuf->n_fragments;
         p_jbuf->packet_cfg.total_fragments = total_fragments;
         packet_reset(p_packet, &p_jbuf->packet_cfg);
@@ -210,7 +215,10 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     EnterCriticalSection(&p_jbuf->mutex);
 #else
     pthread_mutex_lock(&p_jbuf->mutex);
+    pthread_mutex_lock(&p_jbuf->mutex);
 #endif
+
+    // printf("PULL_ENTRY: ExitEmpty %d. Fullness %d. PullIdx %d\n", p_jbuf->b_exit_emptiness, p_jbuf->buffer_fullness, p_jbuf->pull_idx);
 
     if (!p_jbuf->b_exit_emptiness)
     {
@@ -218,20 +226,38 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
         if the buffer underflows, then b_exit_emptiness should be set false until the buffer
         has reached the latency setting */
 
-        if (packet_is_full(&p_jbuf->p_packets[p_jbuf->pull_idx]))
+        int next_idx = (p_jbuf->pull_idx + 1) % p_jbuf->jbuf_len;
+        // printf("PULL: Checking Idx %d. Packet Full? %d.\n", next_idx, packet_is_full(&p_jbuf->p_packets[next_idx]));
+
+        if (packet_is_full(&p_jbuf->p_packets[next_idx]))
         {
+            // Only reset the OLD packet and advance if we found a NEW one.
+            p_jbuf->packet_cfg.total_fragments =  p_jbuf->p_packets[p_jbuf->pull_idx].total_fragments;
+            packet_reset(&p_jbuf->p_packets[p_jbuf->pull_idx], &p_jbuf->packet_cfg);
+            
+            p_jbuf->pull_idx = next_idx;
+            
             p_jbuf->buffer_fullness--;
             // the buffer fullness is only incremented when a full packet has been received.
-        }
-        // Start by freeing the last packet on the buffer.
-        p_jbuf->packet_cfg.total_fragments =  p_jbuf->p_packets[p_jbuf->pull_idx].total_fragments;
-        packet_reset(&p_jbuf->p_packets[p_jbuf->pull_idx], &p_jbuf->packet_cfg);
-        p_jbuf->pull_idx = (p_jbuf->pull_idx + 1) % p_jbuf->jbuf_len;        
 
-        if (p_jbuf->buffer_fullness == 0)
+            if (p_jbuf->buffer_fullness == 0)
+            {
+                /* We need to wait until enough packets have been pushed onto the buffer to resume playback*/
+                p_jbuf->b_exit_emptiness = 1;
+            }
+            // printf("PULL: Returning Idx %d.\n", p_jbuf->pull_idx);
+
+            *pp_new_data = p_jbuf->p_packets[p_jbuf->pull_idx].p_unfragmented_data;
+            *p_n = p_jbuf->p_packets[p_jbuf->pull_idx].unfragmented_size;
+
+#ifdef BLOB_LOG_Pull
+            printf("Blob Jbuf Pull Seq: %d Sz: %d\n", p_jbuf->p_packets[p_jbuf->pull_idx].seq_num, (int)*p_n);
+#endif  
+            ret = BLOB_JBUF_OK; 
+        }
+        else
         {
-            /* We need to wait until enough packets have been pushed onto the buffer to resume playback*/
-            p_jbuf->b_exit_emptiness = 1;
+            ret = BLOB_JBUF_NEED_MORE_DATA; // Explicitly signal no data
         }
         if (p_jbuf->buffer_fullness <= p_jbuf->latency)
         {
@@ -243,11 +269,6 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
             /* This condition should never arise, because we should never pull from the buffer when the buffer is empty. */
             printf("Error, attempted pull when buffer already empty!\n");
             ret = BLOB_JBUF_ERR;
-        }
-        if (packet_is_full(&p_jbuf->p_packets[p_jbuf->pull_idx]))
-        {
-            *pp_new_data = p_jbuf->p_packets[p_jbuf->pull_idx].p_unfragmented_data;
-            *p_n = p_jbuf->p_packets[p_jbuf->pull_idx].unfragmented_size;
         }
     }
     

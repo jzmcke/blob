@@ -17,7 +17,7 @@
 #define TEST_DURATION_MS 20000
 #define SAMPLE_INTERVAL_MS 20
 #define TRIANGLE_MAX 100
-#define PAYLOAD_SIZE 1000
+#define PAYLOAD_SIZE 500 // 2000 bytes, enough for 2 fragments
 
 typedef struct {
     blob_udp *p_udp;
@@ -71,8 +71,6 @@ void* receiver_thread(void *lpParam) {
             float rec_val = -1;
             const float *p_rec_payload = NULL;
             int n_rec_payload = 0;
-
-            // Note: C API needs const int**
             
             const int *p_tick_ptr = NULL;
             int n_tick = 0;
@@ -140,7 +138,8 @@ int main(int argc, char **argv) {
     // But we usually have core-server on 3456.
     // Let's use 3458 for loopback test to avoid conflicts.
     
-    if (blob_udp_init(&p_udp_rx, &cfg_rx, NULL, 0, 3458, 10) != BLOB_OK) return 1;
+    // Initialize RX - Listen on 3458
+    if (blob_udp_init(&p_udp_rx, &cfg_rx, NULL, 0, 3458, 50) != BLOB_OK) return 1;
     if (blob_init(&p_blob_rx, &cfg_rx) != BLOB_OK) return 1;
 
     // Update TX to send to 3458 so RX can see it

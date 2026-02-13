@@ -1,5 +1,6 @@
 #include <stddef.h>
 
+#define BLOB_JBUF_NEED_MORE_DATA (4)
 #define BLOB_JBUF_OVERWROTE_PACKET  (3)
 #define BLOB_JBUF_FRAGMENT_RECEIVED (3)
 #define BLOB_JBUF_DROPPED_FRAGMENT  (2)
