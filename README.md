@@ -92,3 +92,74 @@ cd wasm
 *   `wasm/`: Source and build scripts for the WebAssembly module.
 *   `js/`: legacy JavaScript implementation.
 *   `python_examples/`: Python bindings and examples.
+
+## Usage Examples
+
+### C (Producing Data)
+
+```c
+#include "blob.h"
+
+int main() {
+    // 1. Initialize
+    blob_comm_cfg cfg = { .p_send_cb = my_send_callback, .p_send_context = ctx };
+    blob *p_blob = NULL;
+    blob_init(&p_blob, &cfg);
+    
+    // 2. Start a Node
+    blob_start(p_blob, "sensor_data");
+    
+    // 3. Add Data
+    float temperature[] = { 23.5f, 24.1f };
+    int status[] = { 1, 0 };
+    blob_float_a(p_blob, "temp", temperature, 2);
+    blob_int_a(p_blob, "status", status, 2);
+    
+    // 4. Flush (Serialize & Send)
+    blob_flush(p_blob);
+    
+    // 5. Cleanup
+    blob_close(&p_blob);
+    return 0;
+}
+```
+
+### Python (Sending Data)
+
+```python
+import numpy as np
+import blob.blob_write as bw
+import blob.blob_udp as bu
+
+# 1. Initialize Writer & Transport
+writer = bw.BlobWriter('sensor_data', ['temp', 'status'])
+udp_tx = bu.BlobUDPTx('127.0.0.1', port=3456)
+
+# 2. Update Data
+writer.temp = np.array([23.5, 24.1], dtype=np.float32)
+writer.status = np.array([1, 0], dtype=np.int32)
+
+# 3. Serialize & Send
+data = writer.flush()
+udp_tx.send(data)
+```
+
+### JavaScript / WASM (Consuming Data)
+
+```javascript
+// 1. Initialize Decoder
+import { initBlobWasm, decodeBlob } from './blob_wasm_integration.js';
+await initBlobWasm();
+
+// 2. Receive & Decode (e.g. from WebSocket)
+ws.onmessage = (event) => {
+    // decodeBlob handles WASM memory allocation, jitter buffering, and decoding
+    const nodes = decodeBlob(event.data);
+    
+    nodes.forEach(node => {
+        console.log(`Node: ${node.nodename}`);
+        console.log('Temp:', node.data.temp);
+        console.log('Status:', node.data.status);
+    });
+};
+```
