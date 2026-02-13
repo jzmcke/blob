@@ -95,128 +95,122 @@ cd wasm
 
 ## Usage Examples
 
-### C (Producing Data)
+### C / C++ (Producing Data - UDP)
+
+Instead of manual callbacks, use the built-in UDP backend to transmit blobs.
 
 ```c
 #include "blob.h"
+#include "blob_udp.h"
 
 int main() {
-    // 1. Initialize
-    blob_comm_cfg cfg = { .p_send_cb = my_send_callback, .p_send_context = ctx };
+    blob_comm_cfg cfg;
+    blob_udp *p_udp = NULL;
     blob *p_blob = NULL;
+
+    // 1. Initialize UDP backend (populated 'cfg' with callbacks)
+    blob_udp_init(&p_udp, &cfg, "127.0.0.1", 3456, 0, 0);
+    
+    // 2. Initialize Blob with the UDP config
     blob_init(&p_blob, &cfg);
     
-    // 2. Start a Node
+    // 3. Populate and Send
     blob_start(p_blob, "sensor_data");
-    
-    // 3. Add Data
     float temperature[] = { 23.5f, 24.1f };
-    int status[] = { 1, 0 };
     blob_float_a(p_blob, "temp", temperature, 2);
-    blob_int_a(p_blob, "status", status, 2);
     
-    // 4. Flush (Serialize & Send)
+    // Serializes and triggers the UDP backend send
     blob_flush(p_blob);
     
-    // 5. Cleanup
+    // Cleanup
     blob_close(&p_blob);
+    blob_udp_close(&p_udp);
     return 0;
 }
 ```
 
-### Python (Sending Data)
+### C / C++ (Consuming Data - WebSocket)
+
+```c
+#include "blob.h"
+#include "blob_ws_win.h"
+
+int main() {
+    blob_comm_cfg cfg;
+    blob *p_blob = NULL;
+
+    // 1. Initialize Windows-native WebSocket backend
+    blob_ws_win_init(&cfg, "localhost", 8000);
+    blob_init(&p_blob, &cfg);
+    
+    while (1) {
+        // 2. Service the connection (non-blocking)
+        blob_ws_win_service(&cfg);
+        
+        // 3. Try to retrieve a specific node
+        if (blob_retrieve_start(p_blob, "loopback_test") == 0) {
+            const float *data;
+            int n;
+            blob_retrieve_float_a(p_blob, "test_var", &data, &n, 0);
+            printf("Received %d samples\n", n);
+            blob_retrieve_flush(p_blob);
+        }
+        Sleep(10);
+    }
+}
+```
+
+### Python (Producing Data - UDP)
 
 ```python
 import numpy as np
-import blob.blob_write as bw
-import blob.blob_udp as bu
+from blob.blob_write import BlobWriter
+from blob.blob_udp import BlobUDPTx
 
 # 1. Initialize Writer & Transport
-writer = bw.BlobWriter('sensor_data', ['temp', 'status'])
-udp_tx = bu.BlobUDPTx('127.0.0.1', port=3456)
+writer = BlobWriter('sensor_data', ['temp'])
+udp_tx = BlobUDPTx('127.0.0.1', port=3456)
 
-# 2. Update Data
+# 2. Update Data & Send
 writer.temp = np.array([23.5, 24.1], dtype=np.float32)
-writer.status = np.array([1, 0], dtype=np.int32)
-
-# 3. Serialize & Send
-data = writer.flush()
-udp_tx.send(data)
+data = writer.flush() # Serialize
+udp_tx.send(data)     # Transmit
 ```
 
-### C (Consuming Data)
-
-```c
-#include "blob.h"
-
-// Callback to receive data from transport (e.g., UDP/WS)
-int my_rcv_callback(void *context, unsigned char **pp_data, size_t *p_size) {
-    // 1. Retrieve data from your transport layer
-    *pp_data = my_transport_buffer;
-    *p_size = my_transport_bytes;
-    return 0;
-}
-
-int main() {
-    // 1. Initialize
-    blob_comm_cfg cfg = { .p_rcv_cb = my_rcv_callback, .p_rcv_context = ctx };
-    blob *p_blob = NULL;
-    blob_init(&p_blob, &cfg);
-    
-    // 2. Decode & Process
-    if (blob_retrieve_start(p_blob, "sensor_data") == BLOB_OK) {
-        float *temps;
-        int n_temps;
-        
-        // 3. Extract Variables
-        blob_retrieve_float_a(p_blob, "temp", &temps, &n_temps, 0);
-        
-        for(int i=0; i<n_temps; i++) {
-            printf("Temp[%d]: %f\n", i, temps[i]);
-        }
-    }
-    
-    blob_close(&p_blob);
-    return 0;
-}
-```
-
-### Python (Consuming Data)
+### Python (Consuming Data - UDP)
 
 ```python
-from blob.blob_read import blob_read_node_tree, blob_minimal, blob_flatten
+from blob.blob_udp import BlobUDPRx
+from blob.blob_read import BlobReader
 
-# 1. Receive binary data (e.g., from UDP socket)
-data, addr = sock.recvfrom(4096)
+def on_data(binary_data, addr):
+    # reader handles the tree reconstruction and flattening
+    flat_data = BlobReader.read(binary_data)
+    print(f"Received from {addr}: {flat_data}")
 
-# 2. Parse the binary blob
-# blob_read.py provides a pure Python implementation - no C compilation needed!
-node_tree, remains = blob_read_node_tree(data)
+# 1. Initialize Receiver with a callback
+udp_rx = BlobUDPRx(port=3456, rx_callback=on_data)
 
-# 3. Access Data
-# You can navigate the tree directly or flatten it for easier access
-flat_data = blob_flatten(blob_minimal(node_tree))
-
-print(f"Temp: {flat_data['sensor_data.temp']}")
-print(f"Status: {flat_data['sensor_data.status']}")
+# 2. Start the non-blocking receive thread
+udp_rx.start()
 ```
 
-### JavaScript / WASM (Consuming Data)
+### JavaScript / WASM (Consuming Data - WebSocket)
 
 ```javascript
-// 1. Initialize Decoder
 import { initBlobWasm, decodeBlob } from './blob_wasm_integration.js';
+
 await initBlobWasm();
 
-// 2. Receive & Decode (e.g. from WebSocket)
+const ws = new WebSocket('ws://localhost:8000');
+ws.binaryType = 'arraybuffer';
+
 ws.onmessage = (event) => {
-    // decodeBlob handles WASM memory allocation, jitter buffering, and decoding
+    // decodeBlob reassembles packets and decodes the tree using WASM
     const nodes = decodeBlob(event.data);
     
     nodes.forEach(node => {
-        console.log(`Node: ${node.nodename}`);
-        console.log('Temp:', node.data.temp);
-        console.log('Status:', node.data.status);
+        console.log(`Node: ${node.nodename}`, node.data);
     });
 };
 ```
