@@ -1,14 +1,39 @@
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 
 #include "blob_ws_win.h"
 
 #pragma comment(lib, "ws2_32.lib")
+
+// Fallback for macros if header is being weird
+#ifndef FD_ZERO
+#define FD_ZERO(set) (((fd_set FAR *)(set))->fd_count=0)
+#endif
+#ifndef FD_SET
+#define FD_SET(fd, set) do { \
+    u_int __i; \
+    for (__i = 0; __i < ((fd_set FAR *)(set))->fd_count; __i++) { \
+        if (((fd_set FAR *)(set))->fd_array[__i] == (fd)) { \
+            break; \
+        } \
+    } \
+    if (__i == ((fd_set FAR *)(set))->fd_count) { \
+        if (((fd_set FAR *)(set))->fd_count < FD_SETSIZE) { \
+            ((fd_set FAR *)(set))->fd_array[__i] = (fd); \
+            ((fd_set FAR *)(set))->fd_count++; \
+        } \
+    } \
+} while(0)
+#endif
 
 #define WS_BUFFER_SIZE 65536
 #define WS_HANDSHAKE_TIMEOUT_MS 5000
@@ -31,7 +56,11 @@ typedef struct {
     unsigned char recv_buffer[WS_BUFFER_SIZE];
     size_t recv_len;
     int b_has_data;
-    
+
+    // Persistent receive buffer for raw stream
+    unsigned char raw_recv_buffer[1024 * 1024];
+    size_t raw_recv_len;
+
     // Handshake tracking
     int handshake_sent;
     DWORD connect_start_time;
@@ -75,8 +104,8 @@ static int send_handshake(ws_context_t *ctx) {
 
 // Check if handshake response is complete
 static int check_handshake_response(ws_context_t *ctx) {
-    char buffer[1024];
-    int received = recv(ctx->sock, buffer, sizeof(buffer) - 1, 0);
+    char temp_buffer[1024];
+    int received = recv(ctx->sock, temp_buffer, sizeof(temp_buffer), 0);
     
     if (received == SOCKET_ERROR) {
         int err = WSAGetLastError();
@@ -97,17 +126,51 @@ static int check_handshake_response(ws_context_t *ctx) {
         return -1; // Connection closed
     }
     
-    buffer[received] = '\0';
-    
-    // Simple check for "101 Switching Protocols"
-    if (strstr(buffer, "101") && strstr(buffer, "Switching Protocols")) {
-        ctx->state = WS_STATE_CONNECTED;
-        printf("WebSocket handshake successful\n");
-        return 1; // Success
+    // Append to raw buffer
+    if (ctx->raw_recv_len + received <= sizeof(ctx->raw_recv_buffer)) {
+        memcpy(ctx->raw_recv_buffer + ctx->raw_recv_len, temp_buffer, received);
+        ctx->raw_recv_len += received;
+    } else {
+        return -1; // Buffer too small for handshake? Unexpected.
+    }
+
+    // Ensure null-terminated for strstr (use a temporary check on raw_recv_buffer)
+    // We search for the end of headers: \r\n\r\n
+    unsigned char *p_end = NULL;
+    for (size_t i = 0; i + 3 < ctx->raw_recv_len; i++) {
+        if (ctx->raw_recv_buffer[i] == '\r' && ctx->raw_recv_buffer[i+1] == '\n' &&
+            ctx->raw_recv_buffer[i+2] == '\r' && ctx->raw_recv_buffer[i+3] == '\n') {
+            p_end = ctx->raw_recv_buffer + i + 4;
+            break;
+        }
+    }
+
+    if (p_end) {
+        // Found end of headers. Check if it's a 101.
+        // Temporarily null terminate at p_end to use strstr safely
+        unsigned char saved = *p_end;
+        *p_end = '\0';
+        int is_101 = strstr((char*)ctx->raw_recv_buffer, "101") && strstr((char*)ctx->raw_recv_buffer, "Switching Protocols");
+        *p_end = saved;
+
+        if (is_101) {
+            ctx->state = WS_STATE_CONNECTED;
+            printf("WebSocket handshake successful\n");
+            
+            // Remove headers from buffer, keep any following data
+            size_t header_len = p_end - ctx->raw_recv_buffer;
+            if (ctx->raw_recv_len > header_len) {
+                memmove(ctx->raw_recv_buffer, p_end, ctx->raw_recv_len - header_len);
+            }
+            ctx->raw_recv_len -= header_len;
+            return 1; // Success
+        } else {
+            printf("WebSocket invalid handshake response\n");
+            return -1;
+        }
     }
     
-    printf("WebSocket invalid handshake response\n");
-    return -1; // Invalid response
+    return 0; // Still waiting for more header data
 }
 
 // Encode WebSocket frame (binary, with masking)
@@ -151,6 +214,14 @@ static int encode_ws_frame(unsigned char *out, const unsigned char *data, size_t
 static int decode_ws_frame(const unsigned char *in, size_t in_len, unsigned char *out, size_t *out_len) {
     if (in_len < 2) return 0; // Need at least 2 bytes
     
+    // If the first byte is not a valid start of a binary frame (0x80 | 0x02 = 0x82), 
+    // we might have lost sync. In a real TCP stream this shouldn't happen, 
+    // but if we are at sync, it should be 0x81 (text) or 0x82 (binary).
+    if ((in[0] & 0x70) != 0) {
+        // Unexpected reserved bits. This is likely not a frame start.
+        return -1; 
+    }
+
     unsigned char opcode = in[0] & 0x0F;
     int masked = (in[1] & 0x80) != 0;
     size_t payload_len = in[1] & 0x7F;
@@ -174,10 +245,23 @@ static int decode_ws_frame(const unsigned char *in, size_t in_len, unsigned char
     size_t total_len = header_len + (masked ? 4 : 0) + payload_len;
     if (in_len < total_len) return 0; // Incomplete frame
     
+    // Safety check for output buffer
+    if (payload_len > WS_BUFFER_SIZE) {
+        printf("WebSocket frame too large for buffer: %u bytes\n", (unsigned int)payload_len);
+        return -2; // Fatal error
+    }
+
     // Extract payload (handle masking if present, though server shouldn't mask)
     const unsigned char *payload = in + header_len + (masked ? 4 : 0);
     if (payload_len > 0 && out) {
-        memcpy(out, payload, payload_len);
+        if (masked) {
+            const unsigned char *mask = in + header_len;
+            for (size_t i = 0; i < payload_len; i++) {
+                out[i] = payload[i] ^ mask[i % 4];
+            }
+        } else {
+            memcpy(out, payload, payload_len);
+        }
         *out_len = payload_len;
     }
     
@@ -215,12 +299,40 @@ static int ws_recv_callback(void *context, unsigned char **pp_data, size_t *p_si
         return -1;
     }
     
-    // Return previously received data if available
-    if (ctx->b_has_data) {
-        *pp_data = ctx->recv_buffer;
-        *p_size = ctx->recv_len;
-        ctx->b_has_data = 0;
-        return 0;
+    // Attempt to decode a frame from the raw buffer
+    while (ctx->raw_recv_len > 0) {
+        size_t payload_len = 0;
+        int frame_size = decode_ws_frame(ctx->raw_recv_buffer, ctx->raw_recv_len, ctx->recv_buffer, &payload_len);
+        
+        if (frame_size > 0) {
+            // Found a complete frame
+            *pp_data = ctx->recv_buffer;
+            *p_size = payload_len;
+            
+            // Remove the frame from the raw buffer
+            if (ctx->raw_recv_len > (size_t)frame_size) {
+                memmove(ctx->raw_recv_buffer, ctx->raw_recv_buffer + frame_size, ctx->raw_recv_len - frame_size);
+            }
+            ctx->raw_recv_len -= frame_size;
+            
+            return 0;
+        } else if (frame_size < 0) {
+            // Error or out of sync. Search for next frame start (0x81 or 0x82)
+            printf("WebSocket out of sync! Searching for next frame...\n");
+            size_t shift = 1;
+            while (shift < ctx->raw_recv_len) {
+                if (ctx->raw_recv_buffer[shift] == 0x81 || ctx->raw_recv_buffer[shift] == 0x82) {
+                    break;
+                }
+                shift++;
+            }
+            memmove(ctx->raw_recv_buffer, ctx->raw_recv_buffer + shift, ctx->raw_recv_len - shift);
+            ctx->raw_recv_len -= shift;
+            // Loop and try again with the new start
+        } else {
+            // Incomplete frame, wait for more data
+            return 0;
+        }
     }
     
     return 0;
@@ -281,6 +393,7 @@ int blob_ws_win_service(blob_comm_cfg *p_cfg) {
             connect(ctx->sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
             ctx->state = WS_STATE_CONNECTING;
             ctx->handshake_sent = 0;
+            ctx->raw_recv_len = 0; // Clear buffer on new connection
             break;
         }
         
@@ -320,13 +433,13 @@ int blob_ws_win_service(blob_comm_cfg *p_cfg) {
             int received = recv(ctx->sock, (char*)temp_buffer, sizeof(temp_buffer), 0);
             
             if (received > 0) {
-                // Decode WebSocket frame
-                size_t payload_len = 0;
-                int frame_size = decode_ws_frame(temp_buffer, received, ctx->recv_buffer, &payload_len);
-                
-                if (frame_size > 0 && payload_len > 0) {
-                    ctx->recv_len = payload_len;
-                    ctx->b_has_data = 1;
+                // Append to raw buffer if there's space
+                if (ctx->raw_recv_len + received <= sizeof(ctx->raw_recv_buffer)) {
+                    memcpy(ctx->raw_recv_buffer + ctx->raw_recv_len, temp_buffer, received);
+                    ctx->raw_recv_len += received;
+                } else {
+                    printf("WebSocket raw receive buffer overflow!\n");
+                    ctx->raw_recv_len = 0; // Reset on overflow to try to recover
                 }
             } else if (received == 0) {
                 // Connection closed

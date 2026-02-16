@@ -42,6 +42,9 @@ int
 blob_node_tree_retrieve_flush(blob_node_tree_retrieve *p_ntr);
 
 int
+blob_node_tree_retrieve_clear(blob_node_tree_retrieve *p_ntr);
+
+int
 blob_node_tree_retrieve_int_a(blob_node_tree_retrieve *p_ntr, const char *var_name, const int **pp_var_val, int *p_n, int rep);
 int
 blob_node_tree_retrieve_float_a(blob_node_tree_retrieve *p_ntr, const char *var_name, const float **pp_var_val, int *p_n, int rep);

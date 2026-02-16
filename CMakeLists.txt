@@ -10,4 +10,6 @@ add_subdirectory(make/unit_test)
 add_subdirectory(make/network_test)
 add_subdirectory(make/blob_core_lib)
 add_subdirectory(make/udp_sender)
+add_subdirectory(make/audio_recorder)
+# add_subdirectory(make/whisper_client)
 # Add more as needed

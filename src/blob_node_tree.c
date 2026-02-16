@@ -200,29 +200,37 @@ blob_node_tree_retrieve_start(blob_node_tree_retrieve *p_ntr, const char *p_name
         }
     }
 
-    /* 2. If it's not a child, check if it's a request for the root node (first time or reload) */
-    if ( (NULL == p_ntr->p_root_node) || (0 == strcmp(p_name, p_ntr->p_root_node->p_name)) )
+    /* 2. Check if we need to pull new data or if we are switching back to the root */
+    if ( (NULL == p_ntr->p_root_node) || (0 != strcmp(p_name, p_ntr->p_root_node->p_name)) )
     {
-        unsigned char *p_node_tree_data = NULL;
-        size_t rcv_node_tree_bytes = 0;
-        size_t total_size = 0;
-
-        /* Flush/Clear existing root if we are reloading */
-        if (NULL != p_ntr->p_root_node)
-        {
-            blob_node_close(&p_ntr->p_root_node);
-        }
-
-        /* Receive new data via the provided receive callback (e.g. jbuf pull) */
+        /* Try to pull the packet from the jitter buffer/callback */
         p_ntr->p_rcv_cb(p_ntr->p_rcv_context, &p_ntr->p_data, &p_ntr->n_data);
 
         if (NULL == p_ntr->p_data)
         {
+            /* If we already had a root that matched, we are good. Otherwise, it's just not there. */
+            if (p_ntr->p_root_node && 0 == strcmp(p_name, p_ntr->p_root_node->p_name)) {
+                p_ntr->p_cur_node = p_ntr->p_root_node;
+                return BLOB_OK;
+            }
             return BLOB_ERR;
         }
 
-        p_node_tree_data = p_ntr->p_data + DOWNSTREAM_SERVER_HEADER_BYTES;
-        rcv_node_tree_bytes = p_ntr->n_data - DOWNSTREAM_SERVER_HEADER_BYTES;
+        /* Check for size underflow */
+        if (p_ntr->n_data < DOWNSTREAM_SERVER_HEADER_BYTES)
+        {
+             return BLOB_ERR;
+        }
+
+        unsigned char *p_node_tree_data = p_ntr->p_data + DOWNSTREAM_SERVER_HEADER_BYTES;
+        size_t rcv_node_tree_bytes = p_ntr->n_data - DOWNSTREAM_SERVER_HEADER_BYTES;
+        size_t total_size = 0;
+
+        /* Flush/Clear existing root */
+        if (NULL != p_ntr->p_root_node)
+        {
+            blob_node_close(&p_ntr->p_root_node);
+        }
 
         /* Disassemble the data and create the node-tree */
         blob_node_disassemble_data(&p_ntr->p_root_node, p_node_tree_data, &total_size);
@@ -235,16 +243,23 @@ blob_node_tree_retrieve_start(blob_node_tree_retrieve *p_ntr, const char *p_name
         p_ntr->p_cur_node = p_ntr->p_root_node;
         p_ntr->b_new_data = 1;
 
-        /* Verify the loaded root matches the requested name */
-        if (0 != strcmp(p_name, p_ntr->p_root_node->p_name))
+        /* Verify the loaded root matches requested. If not, we just didn't find what we wanted. */
+        if (p_ntr->p_root_node && 0 == strcmp(p_name, p_ntr->p_root_node->p_name))
         {
-            printf("Error, requested root node '%s' but received '%s'\n", p_name, p_ntr->p_root_node->p_name);
-            return BLOB_ERR;
+            return BLOB_OK;
         }
-        return 0;
+        
+        /* If we got the wrong node, it's not a fatal error, just not the one we want. */
+        return BLOB_ERR;
     }
 
-    printf("Error, invalid node name '%s'\n", p_name);
+    /* 3. Already at the correct root or matched a child */
+    if (p_ntr->p_root_node && 0 == strcmp(p_name, p_ntr->p_root_node->p_name))
+    {
+        p_ntr->p_cur_node = p_ntr->p_root_node;
+        return BLOB_OK;
+    }
+
     return BLOB_ERR;
 }
 
@@ -262,6 +277,18 @@ blob_node_tree_retrieve_flush(blob_node_tree_retrieve *p_ntr)
             p_ntr->b_new_data = 0;
         }
     }
+    return 0;
+}
+
+int
+blob_node_tree_retrieve_clear(blob_node_tree_retrieve *p_ntr)
+{
+    if (NULL != p_ntr->p_root_node)
+    {
+        blob_node_close(&p_ntr->p_root_node);
+    }
+    p_ntr->p_cur_node = NULL;
+    p_ntr->b_new_data = 0;
     return 0;
 }
 

@@ -115,3 +115,9 @@ blob_retrieve_flush(blob *p_blob)
 {
     return blob_node_tree_retrieve_flush(p_blob->p_ntr);
 }
+
+int
+blob_retrieve_clear(blob *p_blob)
+{
+    return blob_node_tree_retrieve_clear(p_blob->p_ntr);
+}

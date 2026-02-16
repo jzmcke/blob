@@ -49,6 +49,9 @@ blob_retrieve_unsigned_int_a(blob *p_blob, const char *var_name, const unsigned 
 int
 blob_retrieve_flush(blob *p_blob);
 
+int
+blob_retrieve_clear(blob *p_blob);
+
 
 #ifdef BLOB_ESP32_WEBSOCKETS
     extern int _blob_espws_init(blob_comm_cfg*,const char*, int);

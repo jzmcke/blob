@@ -6,9 +6,6 @@
 #include "../src/blob_core.h"
 #include "../src/blob_node.h"
 
-// Global jitter buffer instance
-static blob_jbuf *g_jbuf = NULL;
-
 // Deallocate callback for jitter buffer
 static void wasm_dealloc_callback(unsigned char *p_data, void *p_context) {
     if (p_data) {
@@ -17,34 +14,32 @@ static void wasm_dealloc_callback(unsigned char *p_data, void *p_context) {
 }
 
 /**
- * Initialize the blob WASM decoder with jitter buffer
+ * Initialize a new blob WASM decoder with jitter buffer.
+ * Returns a handle (pointer) to the jitter buffer instance.
  */
 EMSCRIPTEN_KEEPALIVE
-int wasm_blob_init(int jbuf_len) {
-    if (g_jbuf != NULL) {
-        return 0; // Already initialized
-    }
-    
+blob_jbuf* wasm_blob_init(int jbuf_len) {
+    blob_jbuf *p_jbuf = NULL;
     blob_jbuf_cfg cfg = {
         .jbuf_len = jbuf_len,
         .deallocate_callback = wasm_dealloc_callback,
         .p_context = NULL
     };
     
-    int result = blob_jbuf_init(&g_jbuf, &cfg);
+    int result = blob_jbuf_init(&p_jbuf, &cfg);
     if (result != BLOB_JBUF_OK) {
-        return -1;
+        return NULL;
     }
     
-    return 0;
+    return p_jbuf;
 }
 
 /**
  * Process an incoming WebSocket packet (may be fragmented)
  */
 EMSCRIPTEN_KEEPALIVE
-int wasm_blob_process_packet(unsigned char *p_data, size_t len) {
-    if (g_jbuf == NULL) {
+int wasm_blob_process_packet(blob_jbuf *p_jbuf, unsigned char *p_data, size_t len) {
+    if (p_jbuf == NULL) {
         return -1; 
     }
     
@@ -52,19 +47,19 @@ int wasm_blob_process_packet(unsigned char *p_data, size_t len) {
     if (!packet_copy) return -1;
     memcpy(packet_copy, p_data, len);
     
-    int result = blob_jbuf_push(g_jbuf, packet_copy, len);
-    return blob_jbuf_get_n_fragments(g_jbuf);
+    int result = blob_jbuf_push(p_jbuf, packet_copy, len);
+    return blob_jbuf_get_n_fragments(p_jbuf);
 }
 
 /**
  * Pull the next complete packet from jitter buffer
  */
 EMSCRIPTEN_KEEPALIVE
-unsigned char* wasm_blob_pull_packet(size_t *p_size) {
-    if (g_jbuf == NULL) return NULL;
+unsigned char* wasm_blob_pull_packet(blob_jbuf *p_jbuf, size_t *p_size) {
+    if (p_jbuf == NULL) return NULL;
     void *p_data = NULL;
     size_t n = 0;
-    int result = blob_jbuf_pull(g_jbuf, &p_data, &n);
+    int result = blob_jbuf_pull(p_jbuf, &p_data, &n);
     if (result != BLOB_JBUF_OK || p_data == NULL) {
         if (p_size) *p_size = 0;
         return NULL;
@@ -74,9 +69,9 @@ unsigned char* wasm_blob_pull_packet(size_t *p_size) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int wasm_blob_get_ready_count() {
-    if (g_jbuf == NULL) return 0;
-    return blob_jbuf_get_n_fragments(g_jbuf);
+int wasm_blob_get_ready_count(blob_jbuf *p_jbuf) {
+    if (p_jbuf == NULL) return 0;
+    return blob_jbuf_get_n_fragments(p_jbuf);
 }
 
 // --- NEW DECODING FUNCTIONS ---
@@ -172,9 +167,8 @@ int wasm_blob_node_get_var_len(blob_node *p_node, int var_idx) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void wasm_blob_cleanup() {
-    if (g_jbuf) {
-        blob_jbuf_close(&g_jbuf);
-        g_jbuf = NULL;
+void wasm_blob_cleanup(blob_jbuf *p_jbuf) {
+    if (p_jbuf) {
+        blob_jbuf_close(&p_jbuf);
     }
 }
