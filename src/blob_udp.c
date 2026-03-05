@@ -95,6 +95,15 @@ int blob_udp_init(blob_udp **pp_ctx, blob_comm_cfg *p_cfg, const char *dest_ip, 
         return -1;
     }
 
+    // Print bound port for debugging
+    struct sockaddr_in sin;
+    socklen_t len = sizeof(sin);
+    if (getsockname(p_ctx->sock, (struct sockaddr *)&sin, &len) == 0) {
+        printf("Blob UDP listening on port %d\n", ntohs(sin.sin_port));
+    } else {
+        printf("Blob UDP listener bound, failed to parse local port.\n");
+    }
+
     // Set non-blocking
 #ifdef _WIN32
     u_long mode = 1;

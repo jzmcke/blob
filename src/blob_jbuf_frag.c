@@ -106,7 +106,7 @@ blob_jbuf_push(blob_jbuf *p_jbuf, void *p_new_data, size_t n)
 
     // Push the new fragment into the buffer queue
     p_jbuf->push_idx = seq_num % p_jbuf->jbuf_len;
-    printf("PUSH: Seq %d -> Idx %d. Fullness %d. ExitEmpty %d\n", seq_num, p_jbuf->push_idx, p_jbuf->buffer_fullness, p_jbuf->b_exit_emptiness);
+    //printf("PUSH: Seq %d -> Idx %d. Fullness %d. ExitEmpty %d\n", seq_num, p_jbuf->push_idx, p_jbuf->buffer_fullness, p_jbuf->b_exit_emptiness);
 
     p_packet = &p_jbuf->p_packets[p_jbuf->push_idx];
 
@@ -251,7 +251,7 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
             *p_n = p_jbuf->p_packets[p_jbuf->pull_idx].unfragmented_size;
 
 #ifdef BLOB_LOG_Pull
-            printf("Blob Jbuf Pull Seq: %d Sz: %d\n", p_jbuf->p_packets[p_jbuf->pull_idx].seq_num, (int)*p_n);
+            //printf("Blob Jbuf Pull Seq: %d Sz: %d\n", p_jbuf->p_packets[p_jbuf->pull_idx].seq_num, (int)*p_n);
 #endif  
             ret = BLOB_JBUF_OK; 
         }

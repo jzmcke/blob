@@ -58,7 +58,7 @@ typedef struct {
     int b_has_data;
 
     // Persistent receive buffer for raw stream
-    unsigned char raw_recv_buffer[1024 * 1024];
+    unsigned char raw_recv_buffer[4 * 1024 * 1024];
     size_t raw_recv_len;
 
     // Handshake tracking
@@ -428,11 +428,10 @@ int blob_ws_win_service(blob_comm_cfg *p_cfg) {
         }
         
         case WS_STATE_CONNECTED: {
-            // Try to receive data
+            // Try to receive all available data
             unsigned char temp_buffer[WS_BUFFER_SIZE];
-            int received = recv(ctx->sock, (char*)temp_buffer, sizeof(temp_buffer), 0);
-            
-            if (received > 0) {
+            int received;
+            while ((received = recv(ctx->sock, (char*)temp_buffer, sizeof(temp_buffer), 0)) > 0) {
                 // Append to raw buffer if there's space
                 if (ctx->raw_recv_len + received <= sizeof(ctx->raw_recv_buffer)) {
                     memcpy(ctx->raw_recv_buffer + ctx->raw_recv_len, temp_buffer, received);
@@ -440,12 +439,20 @@ int blob_ws_win_service(blob_comm_cfg *p_cfg) {
                 } else {
                     printf("WebSocket raw receive buffer overflow!\n");
                     ctx->raw_recv_len = 0; // Reset on overflow to try to recover
+                    break;
                 }
-            } else if (received == 0) {
+            }
+            
+            if (received == 0) {
                 // Connection closed
                 ctx->state = WS_STATE_DISCONNECTED;
                 closesocket(ctx->sock);
                 ctx->sock = INVALID_SOCKET;
+            } else if (received == SOCKET_ERROR) {
+                int err = WSAGetLastError();
+                if (err != WSAEWOULDBLOCK) {
+                    ctx->state = WS_STATE_ERROR;
+                }
             }
             break;
         }

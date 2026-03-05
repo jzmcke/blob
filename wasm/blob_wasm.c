@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <emscripten.h>
 #include "../src/blob_jbuf_frag.h"
+#include "../src/blob_frag_tx.h"
 #include "../src/blob_core.h"
 #include "../src/blob_node.h"
 
@@ -170,5 +171,43 @@ EMSCRIPTEN_KEEPALIVE
 void wasm_blob_cleanup(blob_jbuf *p_jbuf) {
     if (p_jbuf) {
         blob_jbuf_close(&p_jbuf);
+    }
+}
+
+// --- FRAGMENTATION FOR TRANSMISSION ---
+
+EMSCRIPTEN_KEEPALIVE
+blob_frag_tx* wasm_blob_frag_init(int frag_size) {
+    blob_frag_tx *p_tx = NULL;
+    if (blob_frag_tx_init(&p_tx, frag_size) != BLOB_OK) {
+        return NULL;
+    }
+    return p_tx;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int wasm_blob_frag_begin(blob_frag_tx *p_tx, unsigned char *p_data, size_t len) {
+    if (!p_tx || !p_data) return -1;
+    return blob_frag_tx_begin_packet(p_tx, p_data, len);
+}
+
+EMSCRIPTEN_KEEPALIVE
+unsigned char* wasm_blob_frag_next(blob_frag_tx *p_tx, size_t *p_len) {
+    if (!p_tx) return NULL;
+    unsigned char *p_chunk = NULL;
+    size_t chunk_len = 0;
+    int res = blob_frag_tx_next_packet(p_tx, &p_chunk, &chunk_len);
+    if (res == BLOB_OK && p_chunk != NULL) {
+        if (p_len) *p_len = chunk_len;
+        return p_chunk;
+    }
+    if (p_len) *p_len = 0;
+    return NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void wasm_blob_frag_free(blob_frag_tx *p_tx) {
+    if (p_tx) {
+        blob_frag_tx_close(&p_tx);
     }
 }
