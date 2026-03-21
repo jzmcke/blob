@@ -13,8 +13,12 @@ typedef struct blob_jbuf_s blob_jbuf;
 typedef struct blob_jbuf_cfg_s
 {
     int jbuf_len;
+    int target_latency;
     void (*deallocate_callback)(unsigned char *p_data, void *p_context);
     void *p_context;
+#ifdef BLOB_JBUF_STATS
+    const char *identifier; // Unique name for this stream (for stats logging)
+#endif
 } blob_jbuf_cfg;
 
 #ifdef BLOB_WINDOWS_DLL
@@ -40,6 +44,14 @@ __declspec(dllexport)
 #endif
 int
 blob_jbuf_get_n_fragments(blob_jbuf *p_jbuf);
+
+#ifdef BLOB_JBUF_STATS
+#ifdef BLOB_WINDOWS_DLL
+__declspec(dllexport)
+#endif
+int
+blob_jbuf_dump_stats(blob_jbuf *p_jbuf);
+#endif
 
 #ifdef BLOB_WINDOWS_DLL
 __declspec(dllexport)

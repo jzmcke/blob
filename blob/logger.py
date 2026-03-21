@@ -1,4 +1,3 @@
-from cmath import e
 import websocket
 import rel
 import concurrent.futures
@@ -138,5 +137,13 @@ def log_til_sigint(ipaddr, port):
 
 
 if __name__ == "__main__":
-    log_til_sigint("192.168.50.115", str(8000))
-
+    import sys
+    ip = "127.0.0.1"
+    port = "8000"
+    if len(sys.argv) > 1:
+        ip = sys.argv[1]
+    if len(sys.argv) > 2:
+        port = sys.argv[2]
+        
+    print(f"Connecting to ws://{ip}:{port} ...")
+    log_til_sigint(ip, port)

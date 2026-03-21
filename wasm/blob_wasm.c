@@ -146,6 +146,28 @@ float* wasm_blob_node_get_var_data_float(blob_node *p_node, const char *var_name
 }
 
 EMSCRIPTEN_KEEPALIVE
+int* wasm_blob_node_get_var_data_int(blob_node *p_node, const char *var_name, int *p_n) {
+    if (!p_node || !p_node->p_blob) return NULL;
+    const int *p_data = NULL;
+    int n = 0;
+    int result = blob_node_retrieve_int_a(p_node, var_name, &p_data, &n, 0);
+    if (result != BLOB_OK) return NULL;
+    if (p_n) *p_n = n;
+    return (int*)p_data;
+}
+
+EMSCRIPTEN_KEEPALIVE
+unsigned int* wasm_blob_node_get_var_data_uint(blob_node *p_node, const char *var_name, int *p_n) {
+    if (!p_node || !p_node->p_blob) return NULL;
+    const unsigned int *p_data = NULL;
+    int n = 0;
+    int result = blob_node_retrieve_unsigned_int_a(p_node, var_name, &p_data, &n, 0);
+    if (result != BLOB_OK) return NULL;
+    if (p_n) *p_n = n;
+    return (unsigned int*)p_data;
+}
+
+EMSCRIPTEN_KEEPALIVE
 int wasm_blob_node_get_var_type(blob_node *p_node, int var_idx) {
     if (!p_node || !p_node->p_blob) return -1;
     int *p_var_len, *p_var_types;

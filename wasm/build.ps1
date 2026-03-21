@@ -19,7 +19,7 @@ $SOURCES = @(
 $INCLUDES = "-I../include -I../src"
 
 # Exported functions
-$EXPORTS = "['_wasm_blob_init','_wasm_blob_process_packet','_wasm_blob_pull_packet','_wasm_blob_get_ready_count','_wasm_blob_cleanup','_wasm_blob_decode','_wasm_blob_node_free','_wasm_blob_node_get_name','_wasm_blob_node_get_n_children','_wasm_blob_node_get_child','_wasm_blob_node_get_n_vars','_wasm_blob_node_get_var_name','_wasm_blob_node_get_var_data_float','_wasm_blob_node_get_var_type','_wasm_blob_node_get_var_len','_malloc','_free']"
+$EXPORTS = "['_wasm_blob_init','_wasm_blob_process_packet','_wasm_blob_pull_packet','_wasm_blob_get_ready_count','_wasm_blob_cleanup','_wasm_blob_decode','_wasm_blob_node_free','_wasm_blob_node_get_name','_wasm_blob_node_get_n_children','_wasm_blob_node_get_child','_wasm_blob_node_get_n_vars','_wasm_blob_node_get_var_name','_wasm_blob_node_get_var_data_float','_wasm_blob_node_get_var_data_int','_wasm_blob_node_get_var_data_uint','_wasm_blob_node_get_var_type','_wasm_blob_node_get_var_len','_malloc','_free']"
 
 # Exported runtime methods
 $RUNTIME_METHODS = "['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8','getValue','setValue','HEAPU8']"
