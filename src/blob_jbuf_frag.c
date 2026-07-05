@@ -10,6 +10,7 @@
 #else
 #include <pthread.h>
 #include <time.h>
+#define _strdup strdup
 #endif
 
 #define STATS_BUFFER_SIZE 2000

@@ -1,4 +1,3 @@
-#if 0
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -101,6 +100,7 @@ blob_jbuf_pull(blob_jbuf *p_jbuf, void **pp_new_data, size_t *p_n)
     /* This increment is done inside blob_jbuf_release_latest_entry, which means blob_jbuf_release_latest_entry should 
     be called in the same loop as blob_jbuf_pull */
     // p_jbuf->pull_idx = (p_jbuf->pull_idx + 1) % p_jbuf->jbuf_len;
+    return 0;
 }
 
 int
@@ -138,6 +138,7 @@ blob_jbuf_release_latest_entry(blob_jbuf *p_jbuf)
             ret = BLOB_JBUF_ERR;
         }
     }
+    return ret;
 }
 
 int
@@ -153,5 +154,5 @@ blob_jbuf_close(blob_jbuf **pp_jbuf)
     free((*pp_jbuf)->pp_buffer);
     free((*pp_jbuf)->p_size);
     free(*pp_jbuf);
+    return 0;
 }
-#endif
